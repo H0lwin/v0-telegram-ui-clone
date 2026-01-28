@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { cn } from "@/lib/utils"
 import type { Chat, Message } from "@/lib/types"
 import { ChatHeader } from "./chat-header"
 import { MessageList } from "./message-list"
 import { MessageComposer } from "./message-composer"
 import { ChatInfo } from "./chat-info"
+import { SearchMessages } from "./search-messages"
 
 interface ChatViewProps {
   chat: Chat
@@ -16,6 +17,10 @@ interface ChatViewProps {
   onSendMessage: (content: string, replyTo?: { messageId: string; content: string; senderName: string }) => void
   onReact?: (messageId: string, reaction: string) => void
   onDeleteMessage?: (messageId: string) => void
+  onMuteChat?: () => void
+  onPinChat?: () => void
+  onClearHistory?: () => void
+  onDeleteChat?: () => void
   className?: string
 }
 
@@ -27,10 +32,16 @@ export function ChatView({
   onSendMessage,
   onReact,
   onDeleteMessage,
+  onMuteChat,
+  onPinChat,
+  onClearHistory,
+  onDeleteChat,
   className,
 }: ChatViewProps) {
   const [showInfo, setShowInfo] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [highlightedMessage, setHighlightedMessage] = useState<string | null>(null)
 
   const handleReply = useCallback((message: Message) => {
     const sender = chat.participants.find((p) => p.id === message.senderId)
@@ -45,6 +56,12 @@ export function ChatView({
     setReplyingTo(null)
   }
 
+  const handleJumpToMessage = (messageId: string) => {
+    setHighlightedMessage(messageId)
+    // Clear highlight after animation
+    setTimeout(() => setHighlightedMessage(null), 2000)
+  }
+
   return (
     <div className={cn("flex h-full", className)}>
       <div className="flex-1 flex flex-col min-w-0">
@@ -52,7 +69,23 @@ export function ChatView({
           chat={chat}
           onBack={onBack}
           onInfoClick={() => setShowInfo(!showInfo)}
+          onMuteChat={onMuteChat}
+          onPinChat={onPinChat}
+          onClearHistory={onClearHistory}
+          onDeleteChat={onDeleteChat}
+          onSearchMessages={() => setShowSearch(!showSearch)}
         />
+        
+        {/* Search Panel */}
+        {showSearch && (
+          <SearchMessages
+            messages={messages}
+            chat={chat}
+            currentUserId={currentUserId}
+            onClose={() => setShowSearch(false)}
+            onJumpToMessage={handleJumpToMessage}
+          />
+        )}
         
         <div className="flex-1 flex flex-col min-h-0 bg-background">
           <MessageList
@@ -62,6 +95,7 @@ export function ChatView({
             onReply={handleReply}
             onReact={onReact}
             onDelete={onDeleteMessage}
+            highlightedMessage={highlightedMessage}
           />
           
           <MessageComposer

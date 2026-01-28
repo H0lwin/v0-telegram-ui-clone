@@ -207,6 +207,48 @@ export function Messenger() {
     }))
   }, [activeChat])
 
+  const handleMuteChat = useCallback(() => {
+    if (!activeChat) return
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === activeChat ? { ...chat, muted: !chat.muted } : chat
+      )
+    )
+  }, [activeChat])
+
+  const handlePinChat = useCallback(() => {
+    if (!activeChat) return
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === activeChat ? { ...chat, pinned: !chat.pinned } : chat
+      )
+    )
+  }, [activeChat])
+
+  const handleClearHistory = useCallback(() => {
+    if (!activeChat) return
+    setMessages((prev) => ({
+      ...prev,
+      [activeChat]: [],
+    }))
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === activeChat ? { ...chat, lastMessage: undefined } : chat
+      )
+    )
+  }, [activeChat])
+
+  const handleDeleteChat = useCallback(() => {
+    if (!activeChat) return
+    setChats((prev) => prev.filter((chat) => chat.id !== activeChat))
+    setMessages((prev) => {
+      const newMessages = { ...prev }
+      delete newMessages[activeChat]
+      return newMessages
+    })
+    setActiveChat(undefined)
+  }, [activeChat])
+
   const handleMenuNavigate = (screen: string) => {
     if (screen === "settings") {
       setCurrentScreen("settings")
@@ -257,7 +299,11 @@ export function Messenger() {
   if (currentScreen === "settings") {
     return (
       <div className="h-screen w-full bg-background">
-        <Settings onBack={() => setCurrentScreen("chats")} />
+        <Settings 
+          onBack={() => setCurrentScreen("chats")} 
+          darkMode={darkMode}
+          onToggleDarkMode={() => setDarkMode(!darkMode)}
+        />
       </div>
     )
   }
@@ -327,6 +373,10 @@ export function Messenger() {
             onSendMessage={handleSendMessage}
             onReact={handleReact}
             onDeleteMessage={handleDeleteMessage}
+            onMuteChat={handleMuteChat}
+            onPinChat={handlePinChat}
+            onClearHistory={handleClearHistory}
+            onDeleteChat={handleDeleteChat}
             className="w-full"
           />
         ) : (

@@ -1,5 +1,8 @@
 "use client"
 
+import Link from "next/link"
+
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { Chat } from "@/lib/types"
 import { Avatar } from "./avatar"
@@ -9,21 +12,43 @@ import {
   BellOff, 
   ImageIcon, 
   File, 
-  Link, 
+  Link2, 
   Users,
   ChevronRight,
   Trash2,
-  LogOut
+  LogOut,
+  Music,
+  Video
 } from "lucide-react"
 
 interface ChatInfoProps {
   chat: Chat
   onClose: () => void
+  onMute?: () => void
+  onDeleteChat?: () => void
+  onLeaveGroup?: () => void
   className?: string
 }
 
-export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
+type MediaTab = "media" | "files" | "links" | "voice"
+
+export function ChatInfo({ chat, onClose, onMute, onDeleteChat, onLeaveGroup, className }: ChatInfoProps) {
+  const [activeTab, setActiveTab] = useState<MediaTab>("media")
   const participant = chat.participants.find((p) => p.id !== "user-1")
+
+  const mediaTabs: { id: MediaTab; label: string; icon: typeof ImageIcon }[] = [
+    { id: "media", label: "Media", icon: ImageIcon },
+    { id: "files", label: "Files", icon: File },
+    { id: "links", label: "Links", icon: Link2 },
+    { id: "voice", label: "Voice", icon: Music },
+  ]
+
+  // Mock media data
+  const mockMedia = Array.from({ length: 9 }, (_, i) => ({
+    id: `media-${i}`,
+    type: "image",
+    thumbnail: `https://picsum.photos/seed/${chat.id}-${i}/200/200`,
+  }))
 
   return (
     <div className={cn("flex flex-col h-full bg-card", className)}>
@@ -68,7 +93,10 @@ export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
 
         {/* Actions */}
         <div className="border-t border-border">
-          <button className="flex items-center gap-3 w-full px-4 py-3 hover:bg-accent transition-colors">
+          <button 
+            onClick={onMute}
+            className="flex items-center gap-3 w-full px-4 py-3 hover:bg-accent transition-colors"
+          >
             {chat.muted ? (
               <>
                 <Bell className="h-5 w-5 text-muted-foreground" />
@@ -83,37 +111,66 @@ export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
           </button>
         </div>
 
-        {/* Media Section */}
+        {/* Media Section with Tabs */}
         <div className="border-t border-border mt-2">
-          <div className="px-4 py-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Media, Files, Links
-            </span>
+          {/* Tab Headers */}
+          <div className="flex border-b border-border">
+            {mediaTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex-1 py-3 text-xs font-medium transition-colors",
+                  activeTab === tab.id
+                    ? "text-primary border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
           
-          <button className="flex items-center justify-between w-full px-4 py-3 hover:bg-accent transition-colors">
-            <div className="flex items-center gap-3">
-              <ImageIcon className="h-5 w-5 text-muted-foreground" />
-              <span className="text-foreground">Photos & Videos</span>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </button>
-          
-          <button className="flex items-center justify-between w-full px-4 py-3 hover:bg-accent transition-colors">
-            <div className="flex items-center gap-3">
-              <File className="h-5 w-5 text-muted-foreground" />
-              <span className="text-foreground">Files</span>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </button>
-          
-          <button className="flex items-center justify-between w-full px-4 py-3 hover:bg-accent transition-colors">
-            <div className="flex items-center gap-3">
-              <Link className="h-5 w-5 text-muted-foreground" />
-              <span className="text-foreground">Links</span>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </button>
+          {/* Tab Content */}
+          <div className="p-2">
+            {activeTab === "media" && (
+              <div className="grid grid-cols-3 gap-1">
+                {mockMedia.map((item) => (
+                  <button
+                    key={item.id}
+                    className="aspect-square bg-muted rounded overflow-hidden hover:opacity-80 transition-opacity"
+                  >
+                    <img
+                      src={item.thumbnail || "/placeholder.svg"}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            {activeTab === "files" && (
+              <div className="py-8 text-center text-muted-foreground text-sm">
+                <File className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                No files yet
+              </div>
+            )}
+            
+            {activeTab === "links" && (
+              <div className="py-8 text-center text-muted-foreground text-sm">
+                <Link2 className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                No links yet
+              </div>
+            )}
+            
+            {activeTab === "voice" && (
+              <div className="py-8 text-center text-muted-foreground text-sm">
+                <Music className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                No voice messages yet
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Members Section (for groups) */}
@@ -147,12 +204,18 @@ export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
         {/* Danger Zone */}
         <div className="border-t border-border mt-2 mb-4">
           {chat.type === "group" ? (
-            <button className="flex items-center gap-3 w-full px-4 py-3 hover:bg-destructive/10 transition-colors text-destructive">
+            <button 
+              onClick={onLeaveGroup}
+              className="flex items-center gap-3 w-full px-4 py-3 hover:bg-destructive/10 transition-colors text-destructive"
+            >
               <LogOut className="h-5 w-5" />
               <span>Leave Group</span>
             </button>
           ) : (
-            <button className="flex items-center gap-3 w-full px-4 py-3 hover:bg-destructive/10 transition-colors text-destructive">
+            <button 
+              onClick={onDeleteChat}
+              className="flex items-center gap-3 w-full px-4 py-3 hover:bg-destructive/10 transition-colors text-destructive"
+            >
               <Trash2 className="h-5 w-5" />
               <span>Delete Chat</span>
             </button>

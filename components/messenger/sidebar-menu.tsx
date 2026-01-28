@@ -44,10 +44,14 @@ export function SidebarMenu({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - visible on all screen sizes */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        className="fixed inset-0 bg-black/50 z-40"
         onClick={onClose}
+        onKeyDown={(e) => e.key === "Escape" && onClose()}
+        role="button"
+        tabIndex={0}
+        aria-label="Close menu"
       />
 
       {/* Menu Panel */}
@@ -64,7 +68,7 @@ export function SidebarMenu({
             <Avatar name="You" size="lg" />
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full hover:bg-white/20 transition-colors lg:hidden"
+              className="p-1.5 rounded-full hover:bg-white/20 transition-colors"
               aria-label="Close menu"
             >
               <X className="h-5 w-5 text-primary-foreground" />

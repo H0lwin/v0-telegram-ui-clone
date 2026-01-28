@@ -1,14 +1,21 @@
 "use client"
 
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import type { Chat, User } from "@/lib/types"
 import { Avatar } from "./avatar"
 import { ArrowLeft, Phone, Video, MoreVertical, Search } from "lucide-react"
+import { ChatOptionsMenu } from "./chat-options-menu"
 
 interface ChatHeaderProps {
   chat: Chat
   onBack?: () => void
   onInfoClick?: () => void
+  onMuteChat?: () => void
+  onPinChat?: () => void
+  onClearHistory?: () => void
+  onDeleteChat?: () => void
+  onSearchMessages?: () => void
   className?: string
 }
 
@@ -28,7 +35,18 @@ function formatLastSeen(date?: Date): string {
   return `last seen ${days} days ago`
 }
 
-export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderProps) {
+export function ChatHeader({ 
+  chat, 
+  onBack, 
+  onInfoClick,
+  onMuteChat,
+  onPinChat,
+  onClearHistory,
+  onDeleteChat,
+  onSearchMessages,
+  className 
+}: ChatHeaderProps) {
+  const [showMenu, setShowMenu] = useState(false)
   const participant = chat.participants.find((p) => p.id !== "user-1")
   const isOnline = chat.type === "private" ? participant?.online : undefined
   const isTyping = chat.typing && chat.typing.length > 0
@@ -101,6 +119,7 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
       {/* Actions */}
       <div className="flex items-center gap-1">
         <button
+          onClick={onSearchMessages}
           className="p-2 rounded-full hover:bg-accent transition-colors hidden sm:flex"
           aria-label="Search in chat"
         >
@@ -118,12 +137,32 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
         >
           <Video className="h-5 w-5 text-muted-foreground" />
         </button>
-        <button
-          className="p-2 rounded-full hover:bg-accent transition-colors"
-          aria-label="More options"
-        >
-          <MoreVertical className="h-5 w-5 text-muted-foreground" />
-        </button>
+        
+        {/* More Options with Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className={cn(
+              "p-2 rounded-full hover:bg-accent transition-colors",
+              showMenu && "bg-accent"
+            )}
+            aria-label="More options"
+          >
+            <MoreVertical className="h-5 w-5 text-muted-foreground" />
+          </button>
+          
+          <ChatOptionsMenu
+            chat={chat}
+            isOpen={showMenu}
+            onClose={() => setShowMenu(false)}
+            onMute={onMuteChat}
+            onPin={onPinChat}
+            onClearHistory={onClearHistory}
+            onDeleteChat={onDeleteChat}
+            onViewInfo={onInfoClick}
+            onSearchMessages={onSearchMessages}
+          />
+        </div>
       </div>
     </div>
   )

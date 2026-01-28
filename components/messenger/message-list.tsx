@@ -13,6 +13,7 @@ interface MessageListProps {
   onReply?: (message: Message) => void
   onReact?: (messageId: string, reaction: string) => void
   onDelete?: (messageId: string) => void
+  highlightedMessage?: string | null
   className?: string
 }
 
@@ -49,11 +50,23 @@ export function MessageList({
   onReply,
   onReact,
   onDelete,
+  highlightedMessage,
   className,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const isGroupChat = chat.type === "group"
   const isTyping = chat.typing && chat.typing.length > 0
+
+  // Scroll to highlighted message
+  useEffect(() => {
+    if (highlightedMessage && messageRefs.current[highlightedMessage]) {
+      messageRefs.current[highlightedMessage]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      })
+    }
+  }, [highlightedMessage])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -96,7 +109,14 @@ export function MessageList({
         const showAvatar = !isOutgoing && isLastInGroup && isGroupChat
 
         return (
-          <div key={message.id}>
+          <div 
+            key={message.id} 
+            ref={(el) => { messageRefs.current[message.id] = el }}
+            className={cn(
+              "transition-colors duration-500",
+              highlightedMessage === message.id && "bg-primary/20"
+            )}
+          >
             {showDateHeader && (
               <div className="flex justify-center my-4">
                 <span className="px-3 py-1.5 bg-card/90 backdrop-blur-sm rounded-full text-xs text-muted-foreground shadow-sm border border-border/50">
