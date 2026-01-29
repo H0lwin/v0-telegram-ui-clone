@@ -3,7 +3,35 @@
 import { cn } from "@/lib/utils"
 import type { Chat, User } from "@/lib/types"
 import { Avatar } from "./avatar"
-import { ArrowLeft, Phone, Video, MoreVertical, Search } from "lucide-react"
+import { 
+  ArrowLeft, 
+  Phone, 
+  Video, 
+  MoreVertical, 
+  Search,
+  Bell,
+  BellOff,
+  User as UserIcon,
+  Image as ImageIcon,
+  Download,
+  Trash2,
+  History,
+  Info,
+  Rocket,
+  Flag,
+  LogOut,
+  CheckSquare
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+} from "@/components/ui/dropdown-menu"
 
 interface ChatHeaderProps {
   chat: Chat
@@ -118,12 +146,114 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
         >
           <Video className="h-5 w-5 text-muted-foreground" />
         </button>
-        <button
-          className="p-2 rounded-full hover:bg-accent transition-colors"
-          aria-label="More options"
-        >
-          <MoreVertical className="h-5 w-5 text-muted-foreground" />
-        </button>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="p-2 rounded-full hover:bg-accent transition-colors"
+              aria-label="More options"
+            >
+              <MoreVertical className="h-5 w-5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {chat.type === "private" && (
+              <>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Bell className="mr-2 h-4 w-4" />
+                    <span>Mute notifications</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem>Mute for 1 hour</DropdownMenuItem>
+                    <DropdownMenuItem>Mute for 4 hours</DropdownMenuItem>
+                    <DropdownMenuItem>Mute for 8 hours</DropdownMenuItem>
+                    <DropdownMenuItem>Mute for 24 hours</DropdownMenuItem>
+                    <DropdownMenuItem>Mute for 1 week</DropdownMenuItem>
+                    <DropdownMenuItem>Mute For Ever</DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem onClick={onInfoClick}>
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  <span>View profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  <span>Set wallpaper</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Download className="mr-2 h-4 w-4" />
+                  <span>Export chat history</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                  <History className="mr-2 h-4 w-4" />
+                  <span>Clear history</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>Delete chat</span>
+                </DropdownMenuItem>
+              </>
+            )}
+
+            {chat.type === "channel" && (
+              <>
+                <DropdownMenuItem>
+                  <BellOff className="mr-2 h-4 w-4" />
+                  <span>Mute</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onInfoClick}>
+                  <Info className="mr-2 h-4 w-4" />
+                  <span>View channel info</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Rocket className="mr-2 h-4 w-4 text-purple-500" />
+                  <span>Boost channel</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Download className="mr-2 h-4 w-4" />
+                  <span>Export chat history</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Flag className="mr-2 h-4 w-4" />
+                  <span>Report</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Leave channel</span>
+                </DropdownMenuItem>
+              </>
+            )}
+
+            {chat.type === "group" && (
+              <>
+                <DropdownMenuItem>
+                  <Rocket className="mr-2 h-4 w-4 text-purple-500" />
+                  <span>Boost group</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <BellOff className="mr-2 h-4 w-4" />
+                  <span>Mute</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="hidden lg:flex">
+                  <CheckSquare className="mr-2 h-4 w-4" />
+                  <span>Select message</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Flag className="mr-2 h-4 w-4" />
+                  <span>Report</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Leave group</span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )

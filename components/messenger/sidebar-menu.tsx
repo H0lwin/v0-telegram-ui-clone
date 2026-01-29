@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { Avatar } from "./avatar"
 import { 
@@ -40,13 +41,30 @@ export function SidebarMenu({
   onNavigate,
   className,
 }: SidebarMenuProps) {
-  if (!isOpen) return null
+  const [shouldRender, setShouldRender] = useState(isOpen)
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true)
+    }
+  }, [isOpen])
+
+  const handleAnimationEnd = () => {
+    if (!isOpen) {
+      setShouldRender(false)
+    }
+  }
+
+  if (!shouldRender) return null
 
   return (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        className={cn(
+          "fixed inset-0 bg-black/50 z-40 transition-opacity duration-200",
+          isOpen ? "opacity-100 animate-in fade-in" : "opacity-0 animate-out fade-out"
+        )}
         onClick={onClose}
       />
 
@@ -54,9 +72,11 @@ export function SidebarMenu({
       <div
         className={cn(
           "fixed left-0 top-0 bottom-0 w-72 bg-card z-50 flex flex-col shadow-xl",
-          "animate-in slide-in-from-left duration-200",
+          "duration-200",
+          isOpen ? "animate-in slide-in-from-left" : "animate-out slide-out-to-left",
           className
         )}
+        onAnimationEnd={handleAnimationEnd}
       >
         {/* Header */}
         <div className="bg-primary p-4 pb-6">

@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import type { Message, User } from "@/lib/types"
 import { Check, CheckCheck, CornerUpLeft } from "lucide-react"
@@ -60,7 +60,12 @@ export function MessageBubble({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [showReactions, setShowReactions] = useState(false)
   const [reactionPosition, setReactionPosition] = useState({ x: 0, y: 0 })
+  const [mounted, setMounted] = useState(false)
   const bubbleRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -164,7 +169,7 @@ export function MessageBubble({
               isOutgoing ? "text-foreground/60" : "text-muted-foreground"
             )}>
               <span className="text-[11px]">
-                {formatMessageTime(message.timestamp)}
+                {mounted && formatMessageTime(message.timestamp)}
               </span>
               {isOutgoing && <MessageStatus status={message.status} />}
             </div>

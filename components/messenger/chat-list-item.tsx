@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import type { Chat } from "@/lib/types"
 import { Avatar } from "./avatar"
@@ -41,8 +42,13 @@ function MessageStatus({ status }: { status: string }) {
 }
 
 export function ChatListItem({ chat, isActive, onClick }: ChatListItemProps) {
+  const [mounted, setMounted] = useState(false)
   const isOutgoing = chat.lastMessage?.senderId === "user-1"
   const participant = chat.participants.find((p) => p.id !== "user-1")
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <button
@@ -91,7 +97,7 @@ export function ChatListItem({ chat, isActive, onClick }: ChatListItemProps) {
               "text-xs",
               isActive ? "text-primary-foreground/80" : "text-muted-foreground"
             )}>
-              {chat.lastMessage && formatTime(chat.lastMessage.timestamp)}
+              {mounted && chat.lastMessage && formatTime(chat.lastMessage.timestamp)}
             </span>
           </div>
         </div>

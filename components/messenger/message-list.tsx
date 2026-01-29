@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
 import type { Message, User, Chat } from "@/lib/types"
 import { MessageBubble } from "./message-bubble"
@@ -52,8 +52,13 @@ export function MessageList({
   className,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
   const isGroupChat = chat.type === "group"
   const isTyping = chat.typing && chat.typing.length > 0
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -100,7 +105,7 @@ export function MessageList({
             {showDateHeader && (
               <div className="flex justify-center my-4">
                 <span className="px-3 py-1.5 bg-card/90 backdrop-blur-sm rounded-full text-xs text-muted-foreground shadow-sm border border-border/50">
-                  {formatDateHeader(message.timestamp)}
+                  {mounted && formatDateHeader(message.timestamp)}
                 </span>
               </div>
             )}
