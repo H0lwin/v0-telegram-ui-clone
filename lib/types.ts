@@ -22,6 +22,9 @@ export interface Message {
   attachments?: Attachment[]
   reactions?: string[]
   senderName?: string
+  edited?: boolean
+  editTimestamp?: Date
+  pinned?: boolean
 }
 
 export interface Attachment {

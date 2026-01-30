@@ -13,9 +13,11 @@ interface ChatViewProps {
   messages: Message[]
   currentUserId: string
   onBack?: () => void
-  onSendMessage: (content: string, replyTo?: { messageId: string; content: string; senderName: string }) => void
+  onSendMessage: (content: string, replyTo?: { messageId: string; content: string; senderName: string }, editingMessageId?: string) => void
   onReact?: (messageId: string, reaction: string) => void
   onDeleteMessage?: (messageId: string) => void
+  onPinMessage?: (messageId: string) => void
+  onForwardMessage?: (message: Message) => void
   className?: string
 }
 
@@ -27,10 +29,14 @@ export function ChatView({
   onSendMessage,
   onReact,
   onDeleteMessage,
+  onPinMessage,
+  onForwardMessage,
   className,
 }: ChatViewProps) {
   const [showInfo, setShowInfo] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null)
+  const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set())
 
   const handleReply = useCallback((message: Message) => {
     const sender = chat.participants.find((p) => p.id === message.senderId)
@@ -40,9 +46,35 @@ export function ChatView({
     } as Message & { senderName: string })
   }, [chat.participants, currentUserId])
 
-  const handleSendMessage = (content: string, replyTo?: { messageId: string; content: string; senderName: string }) => {
-    onSendMessage(content, replyTo)
+  const handleSendMessage = (content: string, replyTo?: { messageId: string; content: string; senderName: string }, editingMessageId?: string) => {
+    onSendMessage(content, replyTo, editingMessageId)
     setReplyingTo(null)
+    setEditingMessage(null)
+  }
+
+  const handleEdit = (message: Message) => {
+    setEditingMessage(message)
+    setReplyingTo(null)
+  }
+
+  const handleSelect = (messageId: string) => {
+    setSelectedMessages((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId)
+      } else {
+        newSet.add(messageId)
+      }
+      return newSet
+    })
+  }
+
+  const handlePin = (messageId: string) => {
+    onPinMessage?.(messageId)
+  }
+
+  const handleForward = (message: Message) => {
+    onForwardMessage?.(message)
   }
 
   return (
@@ -60,8 +92,13 @@ export function ChatView({
             currentUserId={currentUserId}
             chat={chat}
             onReply={handleReply}
+            onEdit={handleEdit}
             onReact={onReact}
             onDelete={onDeleteMessage}
+            onPin={handlePin}
+            onForward={handleForward}
+            onSelect={handleSelect}
+            selectedMessages={selectedMessages}
           />
           
           <MessageComposer
@@ -72,7 +109,11 @@ export function ChatView({
               senderName: chat.participants.find((p) => p.id === replyingTo.senderId)?.name || 
                 (replyingTo.senderId === currentUserId ? "You" : "Unknown")
             } : undefined}
+            editingMessage={editingMessage || undefined}
             onCancelReply={() => setReplyingTo(null)}
+            onCancelEdit={() => {
+              setEditingMessage(null)
+            }}
           />
         </div>
       </div>

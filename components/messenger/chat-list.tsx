@@ -12,6 +12,14 @@ interface ChatListProps {
   onSelectChat: (chatId: string) => void
   onMenuClick?: () => void
   onNewChat?: () => void
+  onOpenInNewWindow?: (chatId: string) => void
+  onArchive?: (chatId: string) => void
+  onPin?: (chatId: string) => void
+  onMute?: (chatId: string, duration: string) => void
+  onMarkAsRead?: (chatId: string) => void
+  onBlockUser?: (chatId: string) => void
+  onClearHistory?: (chatId: string) => void
+  onDelete?: (chatId: string) => void
   className?: string
 }
 
@@ -21,6 +29,14 @@ export function ChatList({
   onSelectChat,
   onMenuClick,
   onNewChat,
+  onOpenInNewWindow,
+  onArchive,
+  onPin,
+  onMute,
+  onMarkAsRead,
+  onBlockUser,
+  onClearHistory,
+  onDelete,
   className,
 }: ChatListProps) {
   const [searchQuery, setSearchQuery] = useState("")
@@ -94,6 +110,14 @@ export function ChatList({
             chat={chat}
             isActive={activeChat === chat.id}
             onClick={() => onSelectChat(chat.id)}
+            onOpenInNewWindow={onOpenInNewWindow ? () => onOpenInNewWindow(chat.id) : undefined}
+            onArchive={onArchive ? () => onArchive(chat.id) : undefined}
+            onPin={onPin ? () => onPin(chat.id) : undefined}
+            onMute={onMute ? (duration) => onMute(chat.id, duration) : undefined}
+            onMarkAsRead={onMarkAsRead ? () => onMarkAsRead(chat.id) : undefined}
+            onBlockUser={onBlockUser ? () => onBlockUser(chat.id) : undefined}
+            onClearHistory={onClearHistory ? () => onClearHistory(chat.id) : undefined}
+            onDelete={onDelete ? () => onDelete(chat.id) : undefined}
           />
         ))}
 

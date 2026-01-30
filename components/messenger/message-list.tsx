@@ -11,8 +11,13 @@ interface MessageListProps {
   currentUserId: string
   chat: Chat
   onReply?: (message: Message) => void
+  onEdit?: (message: Message) => void
   onReact?: (messageId: string, reaction: string) => void
   onDelete?: (messageId: string) => void
+  onPin?: (messageId: string) => void
+  onForward?: (message: Message) => void
+  onSelect?: (messageId: string) => void
+  selectedMessages?: Set<string>
   className?: string
 }
 
@@ -47,8 +52,13 @@ export function MessageList({
   currentUserId,
   chat,
   onReply,
+  onEdit,
   onReact,
   onDelete,
+  onPin,
+  onForward,
+  onSelect,
+  selectedMessages,
   className,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -119,8 +129,13 @@ export function MessageList({
               isFirstInGroup={isFirstInGroup}
               isLastInGroup={isLastInGroup}
               onReply={onReply}
+              onEdit={onEdit}
               onReact={onReact}
               onDelete={isOutgoing ? onDelete : undefined}
+              onPin={onPin}
+              onForward={onForward}
+              onSelect={onSelect}
+              isSelected={selectedMessages?.has(message.id)}
             />
           </div>
         )

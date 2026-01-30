@@ -20,12 +20,14 @@ import { EmojiPicker } from "./emoji-picker"
 import type { Message } from "@/lib/types"
 
 interface MessageComposerProps {
-  onSend: (content: string, replyTo?: { messageId: string; content: string; senderName: string }) => void
+  onSend: (content: string, replyTo?: { messageId: string; content: string; senderName: string }, editingMessageId?: string) => void
   onAttachment?: (type: string) => void
   placeholder?: string
   disabled?: boolean
   replyingTo?: Message & { senderName?: string }
+  editingMessage?: Message
   onCancelReply?: () => void
+  onCancelEdit?: () => void
   className?: string
 }
 
@@ -43,14 +45,24 @@ export function MessageComposer({
   placeholder = "Message",
   disabled,
   replyingTo,
+  editingMessage,
   onCancelReply,
+  onCancelEdit,
   className,
 }: MessageComposerProps) {
-  const [message, setMessage] = useState("")
+  const [message, setMessage] = useState(editingMessage?.content || "")
   const [showAttachments, setShowAttachments] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const attachmentRef = useRef<HTMLDivElement>(null)
+
+  // Update message when editingMessage changes
+  useEffect(() => {
+    if (editingMessage) {
+      setMessage(editingMessage.content)
+      textareaRef.current?.focus()
+    }
+  }, [editingMessage])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -86,10 +98,12 @@ export function MessageComposer({
               content: replyingTo.content.slice(0, 50), 
               senderName: replyingTo.senderName || "Unknown" 
             } 
-          : undefined
+          : undefined,
+        editingMessage?.id
       )
       setMessage("")
       onCancelReply?.()
+      onCancelEdit?.()
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto"
       }
@@ -101,8 +115,14 @@ export function MessageComposer({
       e.preventDefault()
       handleSend()
     }
-    if (e.key === "Escape" && replyingTo) {
-      onCancelReply?.()
+    if (e.key === "Escape") {
+      if (replyingTo) {
+        onCancelReply?.()
+      }
+      if (editingMessage) {
+        onCancelEdit?.()
+        setMessage("")
+      }
     }
   }
 
@@ -128,6 +148,30 @@ export function MessageComposer({
           </div>
           <button
             onClick={onCancelReply}
+            className="p-1.5 rounded-full hover:bg-accent transition-colors"
+          >
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+      )}
+
+      {/* Edit Preview */}
+      {editingMessage && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-accent/50 border-b border-border">
+          <div className="w-1 h-8 bg-primary rounded-full" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-primary truncate">
+              Edit message
+            </p>
+            <p className="text-sm text-muted-foreground truncate">
+              {editingMessage.content}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              onCancelEdit?.()
+              setMessage("")
+            }}
             className="p-1.5 rounded-full hover:bg-accent transition-colors"
           >
             <X className="h-4 w-4 text-muted-foreground" />

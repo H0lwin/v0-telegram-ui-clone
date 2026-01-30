@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
-import type { Chat, Message } from "@/lib/types"
+import type { Chat, Message, User } from "@/lib/types"
 import { mockChats, mockMessages, currentUser, mockUsers } from "@/lib/mock-data"
 import { ChatList } from "./chat-list"
 import { ChatView } from "./chat-view"
@@ -10,9 +10,82 @@ import { EmptyState } from "./empty-state"
 import { SidebarMenu } from "./sidebar-menu"
 import { Settings } from "./settings"
 import { Contacts } from "./contacts"
+import { ContactsModal } from "./contacts-modal"
+import { AddContactModal } from "./add-contact-modal"
+import { CallsModal, type Call } from "./calls-modal"
+import { Profile } from "./profile"
 import { NewChatDialog } from "./new-chat-dialog"
+import { NewGroupDialog } from "./new-group-dialog"
+import { NewChannelDialog } from "./new-channel-dialog"
+import { DeleteChatModal } from "./delete-chat-modal"
+import { ForwardMessageDialog } from "./forward-message-dialog"
 
-type Screen = "chats" | "settings" | "contacts"
+type Screen = "chats" | "settings" | "contacts" | "profile"
+
+// Mock calls data
+const mockCalls: Call[] = [
+  {
+    id: "call-1",
+    userId: "user-2",
+    userName: "Sarah Chen",
+    direction: "incoming",
+    status: "answered",
+    timestamp: new Date(Date.now() - 1000 * 60 * 30),
+  },
+  {
+    id: "call-2",
+    userId: "user-3",
+    userName: "Alex Johnson",
+    direction: "outgoing",
+    status: "missed",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+  },
+  {
+    id: "call-3",
+    userId: "user-5",
+    userName: "Mike Wilson",
+    direction: "incoming",
+    status: "declined",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
+  },
+  {
+    id: "call-4",
+    userId: "user-6",
+    userName: "Emma Davis",
+    direction: "outgoing",
+    status: "answered",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+  },
+  {
+    id: "call-5",
+    userId: "user-8",
+    userName: "John Smith",
+    direction: "incoming",
+    status: "missed",
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+  },
+]
+
+// Saved Messages chat ID - system chat that always exists
+const SAVED_MESSAGES_CHAT_ID = "saved-messages"
+
+// Create Saved Messages chat
+const savedMessagesChat: Chat = {
+  id: SAVED_MESSAGES_CHAT_ID,
+  type: "private",
+  name: "Saved Messages",
+  participants: [currentUser],
+  unreadCount: 0,
+  pinned: true,
+}
+
+// Ensure Saved Messages is always in the chat list and at the top
+const ensureSavedMessages = (chatList: Chat[]): Chat[] => {
+  // Remove any existing Saved Messages (in case it's in wrong position)
+  const otherChats = chatList.filter((chat) => chat.id !== SAVED_MESSAGES_CHAT_ID)
+  // Always place Saved Messages at the top
+  return [savedMessagesChat, ...otherChats]
+}
 
 // Simulated bot responses
 const botResponses = [
@@ -27,14 +100,36 @@ const botResponses = [
 ]
 
 export function Messenger() {
-  const [chats, setChats] = useState<Chat[]>(mockChats)
-  const [messages, setMessages] = useState<Record<string, Message[]>>(mockMessages)
+  const [chats, setChatsState] = useState<Chat[]>(ensureSavedMessages(mockChats))
+  const [messages, setMessages] = useState<Record<string, Message[]>>({
+    ...mockMessages,
+    [SAVED_MESSAGES_CHAT_ID]: mockMessages[SAVED_MESSAGES_CHAT_ID] || [],
+  })
   const [activeChat, setActiveChat] = useState<string | undefined>()
   const [showMenu, setShowMenu] = useState(false)
   const [showNewChat, setShowNewChat] = useState(false)
+  const [showNewGroup, setShowNewGroup] = useState(false)
+  const [showNewChannel, setShowNewChannel] = useState(false)
+  const [showContactsModal, setShowContactsModal] = useState(false)
+  const [showAddContactModal, setShowAddContactModal] = useState(false)
+  const [showCallsModal, setShowCallsModal] = useState(false)
+  const [calls] = useState<Call[]>(mockCalls)
+  const [showDeleteChatModal, setShowDeleteChatModal] = useState(false)
+  const [chatToDelete, setChatToDelete] = useState<Chat | null>(null)
+  const [showForwardDialog, setShowForwardDialog] = useState(false)
+  const [messagesToForward, setMessagesToForward] = useState<Message[]>([])
+  const [pinnedMessages, setPinnedMessages] = useState<Record<string, string[]>>({})
   const [darkMode, setDarkMode] = useState(false)
   const [currentScreen, setCurrentScreen] = useState<Screen>("chats")
   const [isMobile, setIsMobile] = useState(false)
+
+  // Wrapper to ensure Saved Messages is never removed
+  const setChats = (updater: Chat[] | ((prev: Chat[]) => Chat[])) => {
+    setChatsState((prev) => {
+      const newChats = typeof updater === "function" ? updater(prev) : updater
+      return ensureSavedMessages(newChats)
+    })
+  }
 
   // Handle responsive layout
   useEffect(() => {
@@ -71,8 +166,21 @@ export function Messenger() {
     setActiveChat(undefined)
   }
 
-  const handleSendMessage = useCallback((content: string, replyTo?: { messageId: string; content: string; senderName: string }) => {
+  const handleSendMessage = useCallback((content: string, replyTo?: { messageId: string; content: string; senderName: string }, editingMessageId?: string) => {
     if (!activeChat) return
+
+    // If editing, update existing message
+    if (editingMessageId) {
+      setMessages((prev) => ({
+        ...prev,
+        [activeChat]: prev[activeChat].map((msg) =>
+          msg.id === editingMessageId
+            ? { ...msg, content, edited: true, editTimestamp: new Date() }
+            : msg
+        ),
+      }))
+      return
+    }
 
     const newMessage: Message = {
       id: `msg-${Date.now()}`,
@@ -205,15 +313,165 @@ export function Messenger() {
       ...prev,
       [activeChat]: prev[activeChat].filter((msg) => msg.id !== messageId),
     }))
+
+    // Remove from pinned messages if it was pinned
+    setPinnedMessages((prev) => {
+      const pinned = prev[activeChat] || []
+      return {
+        ...prev,
+        [activeChat]: pinned.filter((id) => id !== messageId),
+      }
+    })
   }, [activeChat])
+
+  const handlePinMessage = useCallback((messageId: string) => {
+    if (!activeChat) return
+
+    setPinnedMessages((prev) => {
+      const pinned = prev[activeChat] || []
+      const isPinned = pinned.includes(messageId)
+      return {
+        ...prev,
+        [activeChat]: isPinned
+          ? pinned.filter((id) => id !== messageId)
+          : [...pinned, messageId],
+      }
+    })
+
+    // Update message pinned status
+    setMessages((prev) => ({
+      ...prev,
+      [activeChat]: prev[activeChat].map((msg) =>
+        msg.id === messageId ? { ...msg, pinned: !msg.pinned } : msg
+      ),
+    }))
+  }, [activeChat])
+
+  const handleForwardMessage = useCallback((message: Message) => {
+    setMessagesToForward([message])
+    setShowForwardDialog(true)
+  }, [])
+
+  const handleForwardMessages = useCallback((chatIds: string[], messages: Message[]) => {
+    chatIds.forEach((chatId) => {
+      const forwardedMessages: Message[] = messages.map((msg) => ({
+        ...msg,
+        id: `msg-${Date.now()}-${Math.random()}`,
+        chatId,
+        timestamp: new Date(),
+        status: "sent" as const,
+      }))
+
+      setMessages((prev) => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), ...forwardedMessages],
+      }))
+
+      // Update chat's last message
+      const lastForwarded = forwardedMessages[forwardedMessages.length - 1]
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId ? { ...chat, lastMessage: lastForwarded } : chat
+        )
+      )
+    })
+  }, [])
 
   const handleMenuNavigate = (screen: string) => {
     if (screen === "settings") {
       setCurrentScreen("settings")
     } else if (screen === "contacts") {
-      setCurrentScreen("contacts")
+      setShowContactsModal(true)
+    } else if (screen === "calls") {
+      setShowCallsModal(true)
+    } else if (screen === "profile") {
+      setCurrentScreen("profile")
+    } else if (screen === "saved") {
+      // Open Saved Messages chat
+      setActiveChat(SAVED_MESSAGES_CHAT_ID)
+      setCurrentScreen("chats")
+    } else if (screen === "new-group") {
+      setShowNewGroup(true)
+    } else if (screen === "new-channel") {
+      setShowNewChannel(true)
     }
     setShowMenu(false)
+  }
+
+  const handleAddContact = (firstName: string, lastName: string, countryCode: string, phoneNumber: string) => {
+    // Create a new contact (frontend only for now)
+    const fullName = lastName.trim() ? `${firstName} ${lastName}` : firstName
+    const newContact: User = {
+      id: `user-${Date.now()}`,
+      name: fullName,
+      online: false,
+    }
+    
+    // In a real app, this would be saved to a backend
+    // For now, we'll just log it
+    console.log("New contact added:", {
+      name: fullName,
+      phone: `+${countryCode}${phoneNumber}`,
+    })
+    
+    // You could add it to mockUsers if needed for demo purposes
+    // mockUsers.push(newContact)
+  }
+
+  const handleCreateGroup = (name: string, avatar: string | undefined, memberIds: string[]) => {
+    // Get selected members
+    const selectedMembers = mockUsers.filter((user) => memberIds.includes(user.id))
+    
+    // Create new group chat
+    const newGroup: Chat = {
+      id: `chat-${Date.now()}`,
+      type: "group",
+      name: name,
+      avatar: avatar,
+      participants: [currentUser, ...selectedMembers],
+      unreadCount: 0,
+    }
+
+    // Add to chats list
+    setChats((prev) => [newGroup, ...prev])
+    
+    // Initialize empty messages for the group
+    setMessages((prev) => ({
+      ...prev,
+      [newGroup.id]: [],
+    }))
+
+    // Optionally select the new group
+    setActiveChat(newGroup.id)
+    setCurrentScreen("chats")
+  }
+
+  const handleCreateChannel = (name: string, avatar: string | undefined, description: string, isPublic: boolean, link: string, memberIds: string[]) => {
+    // Get selected members
+    const selectedMembers = mockUsers.filter((user) => memberIds.includes(user.id))
+    
+    // Create new channel chat
+    const newChannel: Chat = {
+      id: `chat-${Date.now()}`,
+      type: "channel",
+      name: name,
+      avatar: avatar,
+      participants: [currentUser, ...selectedMembers],
+      unreadCount: 0,
+    }
+
+    // Add to chats list
+    setChats((prev) => [newChannel, ...prev])
+    
+    // Initialize empty messages for the channel
+    setMessages((prev) => ({
+      ...prev,
+      [newChannel.id]: [],
+    }))
+
+    // Optionally select the new channel
+    setActiveChat(newChannel.id)
+    setCurrentScreen("chats")
   }
 
   const handleSelectContact = (userId: string) => {
@@ -262,15 +520,11 @@ export function Messenger() {
     )
   }
 
-  // Contacts screen
-  if (currentScreen === "contacts") {
+  // Profile screen
+  if (currentScreen === "profile") {
     return (
       <div className="h-screen w-full bg-background">
-        <Contacts
-          contacts={mockUsers}
-          onBack={() => setCurrentScreen("chats")}
-          onSelectContact={handleSelectContact}
-        />
+        <Profile onBack={() => setCurrentScreen("chats")} />
       </div>
     )
   }
@@ -294,6 +548,99 @@ export function Messenger() {
         onSelectContact={handleSelectContact}
       />
 
+      {/* New Group Dialog */}
+      <NewGroupDialog
+        isOpen={showNewGroup}
+        onClose={() => setShowNewGroup(false)}
+        contacts={mockUsers}
+        onCreateGroup={handleCreateGroup}
+      />
+
+      {/* New Channel Dialog */}
+      <NewChannelDialog
+        isOpen={showNewChannel}
+        onClose={() => setShowNewChannel(false)}
+        contacts={mockUsers}
+        onCreateChannel={handleCreateChannel}
+      />
+
+      {/* Contacts Modal */}
+      <ContactsModal
+        isOpen={showContactsModal}
+        onClose={() => setShowContactsModal(false)}
+        contacts={mockUsers}
+        onSelectContact={handleSelectContact}
+        onAddContact={() => {
+          setShowContactsModal(false)
+          setShowAddContactModal(true)
+        }}
+      />
+
+      {/* Add Contact Modal */}
+      <AddContactModal
+        isOpen={showAddContactModal}
+        onClose={() => setShowAddContactModal(false)}
+        onSave={handleAddContact}
+      />
+
+      {/* Calls Modal */}
+      <CallsModal
+        isOpen={showCallsModal}
+        onClose={() => setShowCallsModal(false)}
+        calls={calls}
+        contacts={mockUsers}
+        onStartNewCall={() => {
+          setShowCallsModal(false)
+          // In a real app, this would open a call interface
+          console.log("Start new call")
+        }}
+        onCallContact={(userId) => {
+          // In a real app, this would initiate a call
+          console.log("Call contact:", userId)
+        }}
+      />
+
+      {/* Delete Chat Modal */}
+      <DeleteChatModal
+        isOpen={showDeleteChatModal}
+        chat={chatToDelete}
+        onClose={() => {
+          setShowDeleteChatModal(false)
+          setChatToDelete(null)
+        }}
+        onConfirm={(deleteForBoth) => {
+          if (chatToDelete) {
+            // Remove chat from list (but preserve Saved Messages)
+            setChats((prev) => prev.filter((chat) => chat.id !== chatToDelete.id && chat.id !== SAVED_MESSAGES_CHAT_ID))
+            // Clear messages
+            setMessages((prev) => {
+              const newMessages = { ...prev }
+              delete newMessages[chatToDelete.id]
+              return newMessages
+            })
+            // Close chat if it was active
+            if (activeChat === chatToDelete.id) {
+              setActiveChat(undefined)
+            }
+          }
+          setShowDeleteChatModal(false)
+          setChatToDelete(null)
+        }}
+      />
+
+      {/* Forward Message Dialog */}
+      <ForwardMessageDialog
+        isOpen={showForwardDialog}
+        messages={messagesToForward}
+        chats={chats.filter((chat) => chat.id !== activeChat && chat.id !== SAVED_MESSAGES_CHAT_ID)}
+        currentUserId={currentUser.id}
+        onClose={() => {
+          setShowForwardDialog(false)
+          setMessagesToForward([])
+        }}
+        onForward={handleForwardMessages}
+      />
+
       {/* Chat List - Always visible on desktop, conditionally on mobile */}
       <div
         className={cn(
@@ -307,6 +654,51 @@ export function Messenger() {
           onSelectChat={handleSelectChat}
           onMenuClick={() => setShowMenu(true)}
           onNewChat={() => setShowNewChat(true)}
+          onOpenInNewWindow={(chatId) => {
+            console.log("Open in new window:", chatId)
+          }}
+          onArchive={(chatId) => {
+            console.log("Archive chat:", chatId)
+          }}
+          onPin={(chatId) => {
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === chatId ? { ...chat, pinned: !chat.pinned } : chat
+              )
+            )
+          }}
+          onMute={(chatId, duration) => {
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === chatId ? { ...chat, muted: true } : chat
+              )
+            )
+            console.log("Mute chat:", chatId, duration)
+          }}
+          onMarkAsRead={(chatId) => {
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
+              )
+            )
+          }}
+          onBlockUser={(chatId) => {
+            console.log("Block user:", chatId)
+          }}
+          onClearHistory={(chatId) => {
+            setMessages((prev) => {
+              const newMessages = { ...prev }
+              delete newMessages[chatId]
+              return newMessages
+            })
+          }}
+          onDelete={(chatId) => {
+            const chat = chats.find((c) => c.id === chatId)
+            if (chat && chat.id !== SAVED_MESSAGES_CHAT_ID) {
+              setChatToDelete(chat)
+              setShowDeleteChatModal(true)
+            }
+          }}
           className="w-full"
         />
       </div>
@@ -327,6 +719,8 @@ export function Messenger() {
             onSendMessage={handleSendMessage}
             onReact={handleReact}
             onDeleteMessage={handleDeleteMessage}
+            onPinMessage={handlePinMessage}
+            onForwardMessage={handleForwardMessage}
             className="w-full"
           />
         ) : (

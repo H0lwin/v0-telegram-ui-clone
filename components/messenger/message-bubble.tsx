@@ -19,8 +19,13 @@ interface MessageBubbleProps {
   isFirstInGroup?: boolean
   isLastInGroup?: boolean
   onReply?: (message: Message) => void
+  onEdit?: (message: Message) => void
   onReact?: (messageId: string, reaction: string) => void
   onDelete?: (messageId: string) => void
+  onPin?: (messageId: string) => void
+  onForward?: (message: Message) => void
+  onSelect?: (messageId: string) => void
+  isSelected?: boolean
 }
 
 function formatMessageTime(date: Date): string {
@@ -54,8 +59,13 @@ export function MessageBubble({
   isFirstInGroup,
   isLastInGroup,
   onReply,
+  onEdit,
   onReact,
   onDelete,
+  onPin,
+  onForward,
+  onSelect,
+  isSelected,
 }: MessageBubbleProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [showReactions, setShowReactions] = useState(false)
@@ -68,8 +78,11 @@ export function MessageBubble({
   }, [])
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY })
+    // Only show context menu on desktop (not mobile)
+    if (window.innerWidth >= 1024) {
+      e.preventDefault()
+      setContextMenu({ x: e.clientX, y: e.clientY })
+    }
   }
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -80,12 +93,82 @@ export function MessageBubble({
   }
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content)
+    if (message.type === "image" || message.attachments?.some(a => a.type === "image")) {
+      // Copy image logic would go here
+      console.log("Copy image")
+    } else if (message.type === "file" || message.attachments?.some(a => a.type === "file")) {
+      // Copy filename
+      const file = message.attachments?.find(a => a.type === "file")
+      if (file?.name) {
+        navigator.clipboard.writeText(file.name)
+      }
+    } else {
+      navigator.clipboard.writeText(message.content)
+    }
+  }
+
+  const handleCopyImage = async () => {
+    const imageAttachment = message.attachments?.find(a => a.type === "image")
+    if (imageAttachment?.url) {
+      try {
+        const response = await fetch(imageAttachment.url)
+        const blob = await response.blob()
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob })
+        ])
+      } catch (err) {
+        console.error("Failed to copy image:", err)
+        // Fallback: copy image URL
+        if (imageAttachment.url) {
+          navigator.clipboard.writeText(imageAttachment.url)
+        }
+      }
+    }
+  }
+
+  const handleCopyFilename = () => {
+    const file = message.attachments?.find(a => a.type === "file")
+    if (file?.name) {
+      navigator.clipboard.writeText(file.name)
+    }
   }
 
   const handleReply = () => {
     if (onReply) {
       onReply(message)
+    }
+  }
+
+  const handleSelect = () => {
+    if (onSelect) {
+      onSelect(message.id)
+    }
+  }
+
+  const handleSaveAs = async () => {
+    const attachment = message.attachments?.[0]
+    if (attachment?.url) {
+      try {
+        const response = await fetch(attachment.url)
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = attachment.name || `download.${attachment.type}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error("Failed to save file:", err)
+      }
+    }
+  }
+
+  const handleShowInFolder = () => {
+    const file = message.attachments?.find(a => a.type === "file")
+    if (file?.url) {
+      window.open(file.url, "_blank")
     }
   }
 
@@ -118,10 +201,18 @@ export function MessageBubble({
           ref={bubbleRef}
           className={cn(
             "max-w-[70%] min-w-[80px] relative",
-            isOutgoing ? "items-end" : "items-start"
+            isOutgoing ? "items-end" : "items-start",
+            isSelected && "ring-2 ring-primary rounded-2xl p-1"
           )}
           onContextMenu={handleContextMenu}
           onDoubleClick={handleDoubleClick}
+          onClick={(e) => {
+            // If selection mode is active, toggle selection on click
+            if (onSelect && e.ctrlKey) {
+              e.preventDefault()
+              handleSelect()
+            }
+          }}
         >
           {/* Reply preview */}
           {message.replyTo && (
@@ -168,6 +259,9 @@ export function MessageBubble({
               "flex items-center justify-end gap-1 mt-1 -mb-0.5",
               isOutgoing ? "text-foreground/60" : "text-muted-foreground"
             )}>
+              {message.edited && (
+                <span className="text-[10px] text-muted-foreground italic">edited</span>
+              )}
               <span className="text-[11px]">
                 {mounted && formatMessageTime(message.timestamp)}
               </span>
@@ -189,18 +283,26 @@ export function MessageBubble({
         </div>
       </div>
 
-      {/* Context Menu */}
-      {contextMenu && (
+      {/* Context Menu - Desktop only */}
+      {contextMenu && window.innerWidth >= 1024 && (
         <MessageContextMenu
           isOpen={true}
           position={contextMenu}
+          message={message}
           isOutgoing={isOutgoing}
           onClose={() => setContextMenu(null)}
           onReply={handleReply}
+          onEdit={isOutgoing && onEdit ? () => onEdit(message) : undefined}
           onCopy={handleCopy}
-          onForward={() => {}}
-          onReact={handleShowReactions}
-          onDelete={isOutgoing && onDelete ? () => onDelete(message.id) : undefined}
+          onCopyImage={message.type === "image" || message.attachments?.some(a => a.type === "image") ? handleCopyImage : undefined}
+          onCopyFilename={message.type === "file" || message.attachments?.some(a => a.type === "file") ? handleCopyFilename : undefined}
+          onForward={onForward ? () => onForward(message) : undefined}
+          onPin={onPin ? () => onPin(message.id) : undefined}
+          onSaveAs={handleSaveAs}
+          onShowInFolder={message.type === "file" || message.attachments?.some(a => a.type === "file") ? handleShowInFolder : undefined}
+          onReact={(reaction) => onReact?.(message.id, reaction)}
+          onDelete={onDelete ? () => onDelete(message.id) : undefined}
+          onSelect={onSelect ? handleSelect : undefined}
         />
       )}
 

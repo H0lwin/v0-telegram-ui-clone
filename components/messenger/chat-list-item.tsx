@@ -1,15 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
 import type { Chat } from "@/lib/types"
 import { Avatar } from "./avatar"
 import { Check, CheckCheck, Pin, VolumeX, Users } from "lucide-react"
+import { ChatContextMenu } from "./chat-context-menu"
 
 interface ChatListItemProps {
   chat: Chat
   isActive?: boolean
   onClick?: () => void
+  onOpenInNewWindow?: () => void
+  onArchive?: () => void
+  onPin?: () => void
+  onMute?: (duration: string) => void
+  onMarkAsRead?: () => void
+  onBlockUser?: () => void
+  onClearHistory?: () => void
+  onDelete?: () => void
 }
 
 function formatTime(date: Date): string {
@@ -41,25 +50,51 @@ function MessageStatus({ status }: { status: string }) {
   return null
 }
 
-export function ChatListItem({ chat, isActive, onClick }: ChatListItemProps) {
+export function ChatListItem({ 
+  chat, 
+  isActive, 
+  onClick,
+  onOpenInNewWindow,
+  onArchive,
+  onPin,
+  onMute,
+  onMarkAsRead,
+  onBlockUser,
+  onClearHistory,
+  onDelete,
+}: ChatListItemProps) {
   const [mounted, setMounted] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const itemRef = useRef<HTMLButtonElement>(null)
   const isOutgoing = chat.lastMessage?.senderId === "user-1"
   const participant = chat.participants.find((p) => p.id !== "user-1")
+  const hasUnread = chat.unreadCount > 0
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // Only show context menu on desktop (not mobile)
+    if (window.innerWidth >= 1024) {
+      e.preventDefault()
+      setContextMenu({ x: e.clientX, y: e.clientY })
+    }
+  }
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all duration-150",
-        isActive 
-          ? "bg-primary text-primary-foreground" 
-          : "hover:bg-accent active:bg-accent/80"
-      )}
-    >
+    <>
+      <button
+        ref={itemRef}
+        onClick={onClick}
+        onContextMenu={handleContextMenu}
+        className={cn(
+          "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all duration-150",
+          isActive 
+            ? "bg-primary text-primary-foreground" 
+            : "hover:bg-accent active:bg-accent/80"
+        )}
+      >
       <Avatar
         name={chat.name}
         size="lg"
@@ -142,5 +177,23 @@ export function ChatListItem({ chat, isActive, onClick }: ChatListItemProps) {
         </div>
       </div>
     </button>
+    {contextMenu && (
+      <ChatContextMenu
+        isOpen={!!contextMenu}
+        position={contextMenu}
+        chat={chat}
+        hasUnread={hasUnread}
+        onClose={() => setContextMenu(null)}
+        onOpenInNewWindow={onOpenInNewWindow}
+        onArchive={onArchive}
+        onPin={onPin}
+        onMute={onMute}
+        onMarkAsRead={hasUnread ? onMarkAsRead : undefined}
+        onBlockUser={chat.type === "private" ? onBlockUser : undefined}
+        onClearHistory={onClearHistory}
+        onDelete={onDelete}
+      />
+    )}
+    </>
   )
 }

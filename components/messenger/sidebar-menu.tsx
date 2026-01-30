@@ -10,9 +10,10 @@ import {
   Phone,
   Settings,
   Moon,
-  Sun,
-  HelpCircle,
-  MessageSquare
+  User,
+  Plus,
+  ChevronUp,
+  Megaphone
 } from "lucide-react"
 
 interface SidebarMenuProps {
@@ -24,13 +25,27 @@ interface SidebarMenuProps {
   className?: string
 }
 
+interface Account {
+  id: string
+  name: string
+  avatar?: string
+  active?: boolean
+  badge?: string
+}
+
+const mockAccounts: Account[] = [
+  { id: "1", name: "H0lwin", active: true, badge: "78.3K" },
+  { id: "2", name: "H0lwin" },
+]
+
 const menuItems = [
-  { icon: Bookmark, label: "Saved Messages", screen: "saved", color: "text-primary" },
-  { icon: Users, label: "Contacts", screen: "contacts", color: "text-blue-500" },
-  { icon: Phone, label: "Calls", screen: "calls", color: "text-green-500" },
-  { icon: MessageSquare, label: "New Group", screen: "new-group", color: "text-purple-500" },
-  { icon: Settings, label: "Settings", screen: "settings", color: "text-muted-foreground" },
-  { icon: HelpCircle, label: "Help", screen: "help", color: "text-muted-foreground" },
+  { icon: User, label: "My Profile", screen: "profile" },
+  { icon: Users, label: "New Group", screen: "new-group" },
+  { icon: Megaphone, label: "New Channel", screen: "new-channel" },
+  { icon: User, label: "Contacts", screen: "contacts" },
+  { icon: Phone, label: "Calls", screen: "calls" },
+  { icon: Bookmark, label: "Saved Messages", screen: "saved" },
+  { icon: Settings, label: "Settings", screen: "settings" },
 ]
 
 export function SidebarMenu({
@@ -71,29 +86,73 @@ export function SidebarMenu({
       {/* Menu Panel */}
       <div
         className={cn(
-          "fixed left-0 top-0 bottom-0 w-72 bg-card z-50 flex flex-col shadow-xl",
+          "fixed left-0 top-0 bottom-0 w-72 bg-sidebar z-50 flex flex-col shadow-xl",
           "duration-200",
           isOpen ? "animate-in slide-in-from-left" : "animate-out slide-out-to-left",
           className
         )}
         onAnimationEnd={handleAnimationEnd}
       >
-        {/* Header */}
-        <div className="bg-primary p-4 pb-6">
-          <div className="flex items-center justify-between mb-4">
-            <Avatar name="You" size="lg" />
+        {/* User Profile Section */}
+        <div className="p-4 border-b border-sidebar-border">
+          <div className="flex items-center gap-3 mb-3">
+            <Avatar name="H0lwin" size="lg" />
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-sidebar-foreground truncate">H0lwin</h3>
+              <button className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <span>Set Emoji Status</span>
+                <ChevronUp className="h-3 w-3" />
+              </button>
+            </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full hover:bg-white/20 transition-colors lg:hidden"
+              className="p-1.5 rounded-full hover:bg-sidebar-accent transition-colors lg:hidden"
               aria-label="Close menu"
             >
-              <X className="h-5 w-5 text-primary-foreground" />
+              <X className="h-5 w-5 text-sidebar-foreground" />
             </button>
           </div>
-          <div>
-            <h3 className="font-semibold text-primary-foreground">Your Name</h3>
-            <p className="text-sm text-primary-foreground/70">+1 234 567 8900</p>
-          </div>
+        </div>
+
+        {/* Account List */}
+        <div className="border-b border-sidebar-border py-2">
+          {mockAccounts.map((account) => (
+            <button
+              key={account.id}
+              onClick={() => {
+                // Handle account switch
+              }}
+              className={cn(
+                "flex items-center gap-3 w-full px-4 py-2.5 hover:bg-sidebar-accent transition-colors",
+                account.active && "bg-sidebar-accent"
+              )}
+            >
+              <Avatar name={account.name} size="md" src={account.avatar} />
+              <div className="flex-1 flex items-center justify-between min-w-0">
+                <span className="text-sm font-medium text-sidebar-foreground truncate">
+                  {account.name}
+                </span>
+                {account.badge && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {account.badge}
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
+          <button
+            className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-sidebar-accent transition-colors"
+            onClick={() => {
+              // Handle add account
+            }}
+          >
+            <div className="h-10 w-10 rounded-full bg-sidebar-accent flex items-center justify-center border-2 border-dashed border-sidebar-border">
+              <Plus className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <span className="text-sm font-medium text-sidebar-foreground">
+              Add Account
+            </span>
+          </button>
         </div>
 
         {/* Menu Items */}
@@ -105,38 +164,47 @@ export function SidebarMenu({
                 onNavigate?.(item.screen)
                 onClose()
               }}
-              className="flex items-center gap-4 w-full px-4 py-3 hover:bg-accent transition-colors"
+              className="flex items-center gap-4 w-full px-4 py-3 hover:bg-sidebar-accent transition-colors"
             >
-              <item.icon className={cn("h-5 w-5", item.color)} />
-              <span className="text-foreground">{item.label}</span>
+              <item.icon className="h-5 w-5 text-sidebar-foreground" />
+              <span className="text-sidebar-foreground">{item.label}</span>
             </button>
           ))}
 
-          <div className="border-t border-border my-2" />
+          <div className="border-t border-sidebar-border my-2" />
 
-          {/* Dark Mode Toggle */}
+          {/* Night Mode Toggle */}
           <button
             onClick={onToggleDarkMode}
-            className="flex items-center gap-4 w-full px-4 py-3 hover:bg-accent transition-colors"
+            className="flex items-center justify-between w-full px-4 py-3 hover:bg-sidebar-accent transition-colors"
           >
-            {darkMode ? (
-              <>
-                <Sun className="h-5 w-5 text-muted-foreground" />
-                <span className="text-foreground">Light Mode</span>
-              </>
-            ) : (
-              <>
-                <Moon className="h-5 w-5 text-muted-foreground" />
-                <span className="text-foreground">Dark Mode</span>
-              </>
-            )}
+            <div className="flex items-center gap-4">
+              <Moon className="h-5 w-5 text-sidebar-foreground" />
+              <span className="text-sidebar-foreground">Night Mode</span>
+            </div>
+            <div
+              className={cn(
+                "relative w-11 h-6 rounded-full transition-colors duration-200",
+                darkMode ? "bg-primary" : "bg-muted"
+              )}
+            >
+              <div
+                className={cn(
+                  "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200",
+                  darkMode && "translate-x-5"
+                )}
+              />
+            </div>
           </button>
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border px-4 py-3">
+        <div className="border-t border-sidebar-border px-4 py-3">
           <p className="text-xs text-muted-foreground text-center">
-            Messenger Clone v1.0
+            Telegram Desktop
+          </p>
+          <p className="text-xs text-muted-foreground text-center mt-1">
+            Version 6.4.2 x64 - About
           </p>
         </div>
       </div>
