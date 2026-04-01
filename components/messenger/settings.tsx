@@ -32,6 +32,7 @@ import {
   LogOut
 } from "lucide-react"
 
+
 interface SettingsProps {
   onBack: () => void
   className?: string
@@ -147,25 +148,31 @@ export function Settings({ onBack, className }: SettingsProps) {
           </div>
         </div>
 
-        {/* Settings Section */}
+        {/* Coming Soon Section */}
         <div className="bg-card mt-2">
-          <h3 className="px-4 py-3 text-sm font-semibold text-primary">Settings</h3>
-          <div className="divide-y divide-border">
-            {settingsItems.map((item) => (
-              <button
-                key={item.label}
-                className="flex items-center gap-4 w-full px-4 py-3 hover:bg-accent transition-colors"
-              >
-                <item.icon className="h-5 w-5 text-foreground flex-shrink-0" />
-                <span className="flex-1 text-foreground text-left">{item.label}</span>
-                {item.value && (
-                  <span className="text-sm text-primary">{item.value}</span>
-                )}
-                {!item.value && (
-                  <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                )}
-              </button>
-            ))}
+          <div className="px-6 py-10 flex flex-col items-center text-center">
+            
+            {/* Icon */}
+            <div className="h-14 w-14 rounded-full bg-accent flex items-center justify-center mb-4">
+              <Zap className="h-6 w-6 text-primary" />
+            </div>
+
+            {/* Title */}
+            <h3 className="text-lg font-semibold text-foreground">
+              Coming Soon
+            </h3>
+
+            {/* Subtitle */}
+            <p className="text-sm text-muted-foreground mt-2 max-w-xs">
+              This section is currently under active development.  
+              New features are being crafted to enhance your experience.
+            </p>
+
+            {/* Badge */}
+            <div className="mt-4 px-3 py-1 rounded-full bg-accent text-xs text-muted-foreground">
+              In Development
+            </div>
+
           </div>
         </div>
 
