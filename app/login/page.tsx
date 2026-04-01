@@ -86,7 +86,7 @@ export default function LoginPage() {
                 <input
                   value={phone}
                   onChange={(e) => setPhone(formatIranPhone(e.target.value))}
-                  placeholder="9123456789"
+                  placeholder="09123456789"
                   className="w-full bg-transparent outline-none"
                 />
               </div>
