@@ -70,6 +70,7 @@ export function EmojiPicker({ onSelect, onClose, className }: EmojiPickerProps) 
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
+            
             {category}
           </button>
         ))}

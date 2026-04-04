@@ -296,7 +296,7 @@ export function MessageBubble({
           onCopy={handleCopy}
           onCopyImage={message.type === "image" || message.attachments?.some(a => a.type === "image") ? handleCopyImage : undefined}
           onCopyFilename={message.type === "file" || message.attachments?.some(a => a.type === "file") ? handleCopyFilename : undefined}
-          onForward={onForward ? () => onForward(message) : undefined}
+          onForward={() => onForward?.(message)}
           onPin={onPin ? () => onPin(message.id) : undefined}
           onSaveAs={handleSaveAs}
           onShowInFolder={message.type === "file" || message.attachments?.some(a => a.type === "file") ? handleShowInFolder : undefined}

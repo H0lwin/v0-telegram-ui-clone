@@ -42,17 +42,17 @@ export function ChatList({
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
 
-  const filteredChats = chats.filter((chat) =>
+  const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const pinnedChats = filteredChats.filter((chat) => chat.pinned)
-  const regularChats = filteredChats.filter((chat) => !chat.pinned)
+  const pinnedChats = filteredChats.filter(chat => chat.pinned)
+  const regularChats = filteredChats.filter(chat => !chat.pinned)
 
   return (
-    <div className={cn("flex flex-col h-full bg-card", className)}>
+    <div className={cn("relative flex flex-col h-full bg-card", className)}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border bg-card/80 backdrop-blur-xl">
         <button
           onClick={onMenuClick}
           className="p-2 rounded-full hover:bg-accent transition-colors"
@@ -60,7 +60,7 @@ export function ChatList({
         >
           <Menu className="h-5 w-5 text-muted-foreground" />
         </button>
-        
+
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -70,15 +70,12 @@ export function ChatList({
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearching(true)}
             onBlur={() => !searchQuery && setIsSearching(false)}
-            className="w-full pl-9 pr-3 py-2 bg-input rounded-full text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            className="w-full pl-9 pr-9 py-2 bg-input rounded-full text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
           />
           {searchQuery && (
             <button
-              onClick={() => {
-                setSearchQuery("")
-                setIsSearching(false)
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-accent"
+              onClick={() => { setSearchQuery(""); setIsSearching(false) }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-accent transition-colors"
             >
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -88,23 +85,34 @@ export function ChatList({
 
       {/* Chat List */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
+        {/* Pinned */}
         {pinnedChats.length > 0 && (
           <div>
-            {pinnedChats.map((chat) => (
+            <div className="px-4 py-1 text-xs text-muted-foreground uppercase font-medium tracking-wide">
+              Pinned
+            </div>
+            {pinnedChats.map(chat => (
               <ChatListItem
                 key={chat.id}
                 chat={chat}
                 isActive={activeChat === chat.id}
                 onClick={() => onSelectChat(chat.id)}
+                onOpenInNewWindow={onOpenInNewWindow ? () => onOpenInNewWindow(chat.id) : undefined}
+                onArchive={onArchive ? () => onArchive(chat.id) : undefined}
+                onPin={onPin ? () => onPin(chat.id) : undefined}
+                onMute={onMute ? (duration) => onMute(chat.id, duration) : undefined}
+                onMarkAsRead={onMarkAsRead ? () => onMarkAsRead(chat.id) : undefined}
+                onBlockUser={onBlockUser ? () => onBlockUser(chat.id) : undefined}
+                onClearHistory={onClearHistory ? () => onClearHistory(chat.id) : undefined}
+                onDelete={onDelete ? () => onDelete(chat.id) : undefined}
               />
             ))}
-            {regularChats.length > 0 && (
-              <div className="border-b border-border" />
-            )}
+            {regularChats.length > 0 && <div className="border-b border-border my-1" />}
           </div>
         )}
-        
-        {regularChats.map((chat) => (
+
+        {/* Regular Chats */}
+        {regularChats.map(chat => (
           <ChatListItem
             key={chat.id}
             chat={chat}
@@ -121,6 +129,7 @@ export function ChatList({
           />
         ))}
 
+        {/* Empty State */}
         {filteredChats.length === 0 && searchQuery && (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Search className="h-12 w-12 mb-3 opacity-50" />
@@ -129,14 +138,16 @@ export function ChatList({
         )}
       </div>
 
-      {/* Floating Action Button */}
-      <button
-        onClick={onNewChat}
-        className="absolute bottom-6 right-6 p-4 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-all active:scale-95"
-        aria-label="New chat"
-      >
-        <Edit className="h-5 w-5" />
-      </button>
+      {/* Floating New Chat Button */}
+      {onNewChat && (
+        <button
+          onClick={onNewChat}
+          className="absolute bottom-6 right-6 p-4 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-all active:scale-95"
+          aria-label="New chat"
+        >
+          <Edit className="h-5 w-5" />
+        </button>
+      )}
     </div>
   )
 }

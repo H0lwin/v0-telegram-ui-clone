@@ -1,13 +1,13 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { Chat, User } from "@/lib/types"
+import type { Chat } from "@/lib/types"
 import { Avatar } from "./avatar"
-import { 
-  ArrowLeft, 
-  Phone, 
-  Video, 
-  MoreVertical, 
+import {
+  ArrowLeft,
+  Phone,
+  Video,
+  MoreVertical,
   Search,
   Bell,
   BellOff,
@@ -22,6 +22,7 @@ import {
   LogOut,
   CheckSquare
 } from "lucide-react"
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,18 +34,35 @@ import {
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu"
 
-interface ChatHeaderProps {
-  chat: Chat
-  onBack?: () => void
-  onInfoClick?: () => void
-  className?: string
+/* ---------- Small reusable button ---------- */
+
+function HeaderButton({
+  children,
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...props}
+      className={cn(
+        "p-2 rounded-full transition-all",
+        "hover:bg-accent/60 active:scale-95",
+        className
+      )}
+    >
+      {children}
+    </button>
+  )
 }
+
+/* ---------- Utils ---------- */
 
 function formatLastSeen(date?: Date): string {
   if (!date) return "last seen recently"
-  
+
   const now = new Date()
   const diff = now.getTime() - date.getTime()
+
   const minutes = Math.floor(diff / (1000 * 60))
   const hours = Math.floor(diff / (1000 * 60 * 60))
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -56,12 +74,21 @@ function formatLastSeen(date?: Date): string {
   return `last seen ${days} days ago`
 }
 
+/* ---------- Component ---------- */
+
+interface ChatHeaderProps {
+  chat: Chat
+  onBack?: () => void
+  onInfoClick?: () => void
+  className?: string
+}
+
 export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderProps) {
   const participant = chat.participants.find((p) => p.id !== "user-1")
   const isOnline = chat.type === "private" ? participant?.online : undefined
   const isTyping = chat.typing && chat.typing.length > 0
 
-  const getSubtitle = () => {
+  const subtitle = (() => {
     if (isTyping) {
       return (
         <span className="text-primary animate-pulse">
@@ -69,94 +96,86 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
         </span>
       )
     }
-    
+
     if (chat.type === "private") {
       if (participant?.online) {
         return <span className="text-online font-medium">online</span>
       }
       return formatLastSeen(participant?.lastSeen)
     }
-    
+
     if (chat.type === "group") {
       const onlineCount = chat.participants.filter(p => p.online).length
-      return `${chat.participants.length} members${onlineCount > 0 ? `, ${onlineCount} online` : ""}`
+      return `${chat.participants.length} members${
+        onlineCount > 0 ? `, ${onlineCount} online` : ""
+      }`
     }
-    
+
     if (chat.type === "channel") {
       return "channel"
     }
-    
+
     return null
-  }
+  })()
 
   return (
-    <div className={cn(
-      "flex items-center gap-2 px-2 py-2 border-b border-border bg-card",
-      className
-    )}>
-      {/* Back button (mobile) */}
+    <div
+      className={cn(
+        "flex items-center gap-2 px-2 py-2",
+        "bg-card/80 backdrop-blur-xl border-b border-border/60",
+        className
+      )}
+    >
+      {/* Back */}
       {onBack && (
-        <button
-          onClick={onBack}
-          className="p-2 rounded-full hover:bg-accent transition-colors lg:hidden"
-          aria-label="Back"
-        >
+        <HeaderButton onClick={onBack} className="lg:hidden">
           <ArrowLeft className="h-5 w-5 text-foreground" />
-        </button>
+        </HeaderButton>
       )}
 
-      {/* Avatar and Info */}
+      {/* Chat Info */}
       <button
         onClick={onInfoClick}
-        className="flex-1 flex items-center gap-3 min-w-0 hover:bg-accent/50 rounded-lg p-1 -m-1 transition-colors"
+        className="flex-1 flex items-center gap-3 min-w-0 px-2 py-1 rounded-xl hover:bg-accent/50 transition"
       >
-        <Avatar
-          name={chat.name}
-          size="md"
-          online={isOnline}
-        />
-        
+        <Avatar name={chat.name} size="md" online={isOnline} />
+
         <div className="flex-1 min-w-0 text-left">
-          <h2 className="font-semibold text-foreground truncate">
+          <h2 className="font-semibold text-foreground truncate leading-tight">
             {chat.name}
           </h2>
           <p className="text-xs text-muted-foreground truncate">
-            {getSubtitle()}
+            {subtitle}
           </p>
         </div>
       </button>
 
       {/* Actions */}
       <div className="flex items-center gap-1">
-        <button
-          className="p-2 rounded-full hover:bg-accent transition-colors hidden sm:flex"
-          aria-label="Search in chat"
-        >
+        <HeaderButton className="hidden sm:flex">
           <Search className="h-5 w-5 text-muted-foreground" />
-        </button>
-        <button
-          className="p-2 rounded-full hover:bg-accent transition-colors hidden sm:flex"
-          aria-label="Voice call"
-        >
+        </HeaderButton>
+
+        <HeaderButton className="hidden sm:flex">
           <Phone className="h-5 w-5 text-muted-foreground" />
-        </button>
-        <button
-          className="p-2 rounded-full hover:bg-accent transition-colors hidden md:flex"
-          aria-label="Video call"
-        >
+        </HeaderButton>
+
+        <HeaderButton className="hidden md:flex">
           <Video className="h-5 w-5 text-muted-foreground" />
-        </button>
-        
+        </HeaderButton>
+
+        {/* Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              className="p-2 rounded-full hover:bg-accent transition-colors"
-              aria-label="More options"
-            >
+            <HeaderButton>
               <MoreVertical className="h-5 w-5 text-muted-foreground" />
-            </button>
+            </HeaderButton>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+
+          <DropdownMenuContent
+            align="end"
+            className="w-56 backdrop-blur-xl bg-popover/80 border border-border/60"
+          >
             {chat.type === "private" && (
               <>
                 <DropdownMenuSub>
@@ -165,64 +184,40 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
                     <span>Mute notifications</span>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
-                    <DropdownMenuItem>Mute for 1 hour</DropdownMenuItem>
-                    <DropdownMenuItem>Mute for 4 hours</DropdownMenuItem>
-                    <DropdownMenuItem>Mute for 8 hours</DropdownMenuItem>
-                    <DropdownMenuItem>Mute for 24 hours</DropdownMenuItem>
-                    <DropdownMenuItem>Mute for 1 week</DropdownMenuItem>
-                    <DropdownMenuItem>Mute For Ever</DropdownMenuItem>
+                    <DropdownMenuItem>1 hour</DropdownMenuItem>
+                    <DropdownMenuItem>4 hours</DropdownMenuItem>
+                    <DropdownMenuItem>8 hours</DropdownMenuItem>
+                    <DropdownMenuItem>24 hours</DropdownMenuItem>
+                    <DropdownMenuItem>1 week</DropdownMenuItem>
+                    <DropdownMenuItem>Forever</DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+
                 <DropdownMenuItem onClick={onInfoClick}>
                   <UserIcon className="mr-2 h-4 w-4" />
-                  <span>View profile</span>
+                  View profile
                 </DropdownMenuItem>
+
                 <DropdownMenuItem>
                   <ImageIcon className="mr-2 h-4 w-4" />
-                  <span>Set wallpaper</span>
+                  Set wallpaper
                 </DropdownMenuItem>
+
                 <DropdownMenuItem>
                   <Download className="mr-2 h-4 w-4" />
-                  <span>Export chat history</span>
+                  Export chat history
                 </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem className="text-destructive focus:text-destructive">
                   <History className="mr-2 h-4 w-4" />
-                  <span>Clear history</span>
+                  Clear history
                 </DropdownMenuItem>
+
                 <DropdownMenuItem className="text-destructive focus:text-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
-                  <span>Delete chat</span>
-                </DropdownMenuItem>
-              </>
-            )}
-
-            {chat.type === "channel" && (
-              <>
-                <DropdownMenuItem>
-                  <BellOff className="mr-2 h-4 w-4" />
-                  <span>Mute</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onInfoClick}>
-                  <Info className="mr-2 h-4 w-4" />
-                  <span>View channel info</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Rocket className="mr-2 h-4 w-4 text-purple-500" />
-                  <span>Boost channel</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Download className="mr-2 h-4 w-4" />
-                  <span>Export chat history</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Flag className="mr-2 h-4 w-4" />
-                  <span>Report</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive focus:text-destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Leave channel</span>
+                  Delete chat
                 </DropdownMenuItem>
               </>
             )}
@@ -231,24 +226,60 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
               <>
                 <DropdownMenuItem>
                   <Rocket className="mr-2 h-4 w-4 text-purple-500" />
-                  <span>Boost group</span>
+                  Boost group
                 </DropdownMenuItem>
+
                 <DropdownMenuItem>
                   <BellOff className="mr-2 h-4 w-4" />
-                  <span>Mute</span>
+                  Mute
                 </DropdownMenuItem>
+
                 <DropdownMenuItem className="hidden lg:flex">
                   <CheckSquare className="mr-2 h-4 w-4" />
-                  <span>Select message</span>
+                  Select messages
                 </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem>
                   <Flag className="mr-2 h-4 w-4" />
-                  <span>Report</span>
+                  Report
                 </DropdownMenuItem>
+
                 <DropdownMenuItem className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Leave group</span>
+                  Leave group
+                </DropdownMenuItem>
+              </>
+            )}
+
+            {chat.type === "channel" && (
+              <>
+                <DropdownMenuItem>
+                  <BellOff className="mr-2 h-4 w-4" />
+                  Mute
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={onInfoClick}>
+                  <Info className="mr-2 h-4 w-4" />
+                  View channel info
+                </DropdownMenuItem>
+
+                <DropdownMenuItem>
+                  <Rocket className="mr-2 h-4 w-4 text-purple-500" />
+                  Boost channel
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem>
+                  <Flag className="mr-2 h-4 w-4" />
+                  Report
+                </DropdownMenuItem>
+
+                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Leave channel
                 </DropdownMenuItem>
               </>
             )}
