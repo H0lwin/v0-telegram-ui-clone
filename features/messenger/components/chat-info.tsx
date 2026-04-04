@@ -34,7 +34,7 @@ function InfoRow({
     <button
       onClick={onClick}
       className={cn(
-        "group flex items-center justify-between w-full px-4 py-3 rounded-xl transition-all",
+        "group flex items-center justify-between w-full px-4 py-3 rounded-xl transition-colors",
         "hover:bg-accent/60 active:scale-[0.98]",
         danger && "text-destructive hover:bg-destructive/10"
       )}
@@ -61,21 +61,31 @@ function InfoRow({
 interface ChatInfoProps {
   chat: Chat
   onClose: () => void
+  onToggleMute?: () => void
+  onShowMedia?: (tab: "photos" | "files" | "links") => void
+  onLeaveOrDelete?: () => void
   className?: string
 }
 
-export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
+export function ChatInfo({
+  chat,
+  onClose,
+  onToggleMute,
+  onShowMedia,
+  onLeaveOrDelete,
+  className,
+}: ChatInfoProps) {
   const participant = chat.participants.find((p) => p.id !== "user-1")
 
   return (
     <div
       className={cn(
-        "flex flex-col h-full bg-card/80 backdrop-blur-xl border-l border-border",
+        "flex flex-col h-full bg-card border-l border-border",
         className
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 backdrop-blur-md">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
         <h3 className="font-semibold text-foreground">Info</h3>
 
         <button
@@ -123,10 +133,11 @@ export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
 
         {/* Actions */}
         <div className="px-2">
-          <div className="bg-background/60 backdrop-blur-md rounded-2xl p-1 border border-border/60">
+          <div className="bg-background rounded-2xl p-1 border border-border/60">
             <InfoRow
               icon={chat.muted ? Bell : BellOff}
               label={chat.muted ? "Unmute notifications" : "Mute notifications"}
+              onClick={onToggleMute}
             />
           </div>
         </div>
@@ -137,10 +148,10 @@ export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
             Media & Files
           </p>
 
-          <div className="bg-background/60 backdrop-blur-md rounded-2xl p-1 border border-border/60">
-            <InfoRow icon={ImageIcon} label="Photos & Videos" />
-            <InfoRow icon={File} label="Files" />
-            <InfoRow icon={Link} label="Links" />
+          <div className="bg-background rounded-2xl p-1 border border-border/60">
+            <InfoRow icon={ImageIcon} label="Photos & Videos" onClick={() => onShowMedia?.("photos")} />
+            <InfoRow icon={File} label="Files" onClick={() => onShowMedia?.("files")} />
+            <InfoRow icon={Link} label="Links" onClick={() => onShowMedia?.("links")} />
           </div>
         </div>
 
@@ -151,7 +162,7 @@ export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
               {chat.participants.length} Members
             </p>
 
-            <div className="bg-background/60 backdrop-blur-md rounded-2xl border border-border/60 divide-y divide-border/40">
+            <div className="bg-background rounded-2xl border border-border/60 divide-y divide-border/40">
               {chat.participants.map((member) => (
                 <div
                   key={member.id}
@@ -175,18 +186,20 @@ export function ChatInfo({ chat, onClose, className }: ChatInfoProps) {
 
         {/* Danger */}
         <div className="px-2">
-          <div className="bg-background/60 backdrop-blur-md rounded-2xl p-1 border border-border/60">
+          <div className="bg-background rounded-2xl p-1 border border-border/60">
             {chat.type === "group" ? (
               <InfoRow
                 icon={LogOut}
                 label="Leave group"
                 danger
+                onClick={onLeaveOrDelete}
               />
             ) : (
               <InfoRow
                 icon={Trash2}
                 label="Delete chat"
                 danger
+                onClick={onLeaveOrDelete}
               />
             )}
           </div>

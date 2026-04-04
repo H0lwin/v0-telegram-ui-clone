@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { X, Search, Camera, Check } from "lucide-react"
 import { Avatar } from "./avatar"
@@ -24,6 +24,7 @@ export function NewGroupDialog({
   const [groupAvatar, setGroupAvatar] = useState<string | undefined>(undefined)
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
 
@@ -66,12 +67,20 @@ export function NewGroupDialog({
   }
 
   const handleAvatarClick = () => {
-    // For now, we'll just use a placeholder or let the user input a URL
-    // In a real app, this would open a file picker
-    const url = prompt("Enter image URL (or leave empty for default):")
-    if (url !== null) {
-      setGroupAvatar(url || undefined)
+    fileInputRef.current?.click()
+  }
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setGroupAvatar(reader.result)
+      }
     }
+    reader.readAsDataURL(file)
   }
 
   return (
@@ -108,6 +117,13 @@ export function NewGroupDialog({
                     name={groupName || "Group"} 
                     src={groupAvatar}
                     size="xl" 
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
                   />
                   <button
                     onClick={handleAvatarClick}

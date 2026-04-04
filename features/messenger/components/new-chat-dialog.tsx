@@ -12,6 +12,7 @@ interface NewChatDialogProps {
   contacts: User[]
   onSelectContact: (userId: string) => void
   onCreateGroup?: () => void
+  onAddContact?: () => void
 }
 
 export function NewChatDialog({
@@ -20,6 +21,7 @@ export function NewChatDialog({
   contacts,
   onSelectContact,
   onCreateGroup,
+  onAddContact,
 }: NewChatDialogProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -77,6 +79,7 @@ export function NewChatDialog({
             <span className="font-medium">New Group</span>
           </button>
           <button
+            onClick={onAddContact}
             className="flex items-center gap-3 w-full px-4 py-3 hover:bg-accent transition-colors"
           >
             <div className="p-2 bg-primary rounded-full">

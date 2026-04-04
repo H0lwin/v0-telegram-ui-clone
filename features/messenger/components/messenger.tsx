@@ -100,6 +100,7 @@ const botResponses = [
 ]
 
 export function Messenger() {
+  const [contacts, setContacts] = useState<User[]>(mockUsers)
   const [chats, setChatsState] = useState<Chat[]>(ensureSavedMessages(mockChats))
   const [messages, setMessages] = useState<Record<string, Message[]>>({
     ...mockMessages,
@@ -113,7 +114,7 @@ export function Messenger() {
   const [showContactsModal, setShowContactsModal] = useState(false)
   const [showAddContactModal, setShowAddContactModal] = useState(false)
   const [showCallsModal, setShowCallsModal] = useState(false)
-  const [calls] = useState<Call[]>(mockCalls)
+  const [calls, setCalls] = useState<Call[]>(mockCalls)
   const [showDeleteChatModal, setShowDeleteChatModal] = useState(false)
   const [chatToDelete, setChatToDelete] = useState<Chat | null>(null)
   const [showForwardDialog, setShowForwardDialog] = useState(false)
@@ -122,6 +123,8 @@ export function Messenger() {
   const [darkMode, setDarkMode] = useState(false)
   const [currentScreen, setCurrentScreen] = useState<Screen>("chats")
   const [isMobile, setIsMobile] = useState(false)
+  const [archivedChatIds, setArchivedChatIds] = useState<Set<string>>(new Set())
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set())
 
   // Wrapper to ensure Saved Messages is never removed
   const setChats = (updater: Chat[] | ((prev: Chat[]) => Chat[])) => {
@@ -150,6 +153,17 @@ export function Messenger() {
     }
   }, [darkMode])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const chatId = params.get("chat")
+    if (!chatId) return
+    const exists = chats.some((chat) => chat.id === chatId)
+    if (exists) {
+      setActiveChat(chatId)
+      setCurrentScreen("chats")
+    }
+  }, [chats])
+
   const handleSelectChat = (chatId: string) => {
     setActiveChat(chatId)
     setCurrentScreen("chats")
@@ -165,6 +179,24 @@ export function Messenger() {
   const handleBack = () => {
     setActiveChat(undefined)
   }
+
+  const removeChatCompletely = useCallback((chatId: string) => {
+    if (chatId === SAVED_MESSAGES_CHAT_ID) return
+    setChats((prev) => prev.filter((chat) => chat.id !== chatId))
+    setMessages((prev) => {
+      const next = { ...prev }
+      delete next[chatId]
+      return next
+    })
+    setArchivedChatIds((prev) => {
+      const next = new Set(prev)
+      next.delete(chatId)
+      return next
+    })
+    if (activeChat === chatId) {
+      setActiveChat(undefined)
+    }
+  }, [])
 
   const handleSendMessage = useCallback((content: string, replyTo?: { messageId: string; content: string; senderName: string }, editingMessageId?: string) => {
     if (!activeChat) return
@@ -398,29 +430,20 @@ export function Messenger() {
     setShowMenu(false)
   }
 
-  const handleAddContact = (firstName: string, lastName: string, countryCode: string, phoneNumber: string) => {
-    // Create a new contact (frontend only for now)
+  const handleAddContact = (firstName: string, lastName: string, _countryCode: string, _phoneNumber: string) => {
     const fullName = lastName.trim() ? `${firstName} ${lastName}` : firstName
     const newContact: User = {
       id: `user-${Date.now()}`,
       name: fullName,
       online: false,
     }
-    
-    // In a real app, this would be saved to a backend
-    // For now, we'll just log it
-    console.log("New contact added:", {
-      name: fullName,
-      phone: `+${countryCode}${phoneNumber}`,
-    })
-    
-    // You could add it to mockUsers if needed for demo purposes
-    // mockUsers.push(newContact)
+    setContacts((prev) => [newContact, ...prev.filter((user) => user.id !== newContact.id)])
+    handleSelectContact(newContact.id)
+    setShowAddContactModal(false)
   }
 
   const handleCreateGroup = (name: string, avatar: string | undefined, memberIds: string[]) => {
-    // Get selected members
-    const selectedMembers = mockUsers.filter((user) => memberIds.includes(user.id))
+    const selectedMembers = contacts.filter((user) => memberIds.includes(user.id))
     
     // Create new group chat
     const newGroup: Chat = {
@@ -447,8 +470,7 @@ export function Messenger() {
   }
 
   const handleCreateChannel = (name: string, avatar: string | undefined, description: string, isPublic: boolean, link: string, memberIds: string[]) => {
-    // Get selected members
-    const selectedMembers = mockUsers.filter((user) => memberIds.includes(user.id))
+    const selectedMembers = contacts.filter((user) => memberIds.includes(user.id))
     
     // Create new channel chat
     const newChannel: Chat = {
@@ -486,7 +508,7 @@ export function Messenger() {
       handleSelectChat(existingChat.id)
     } else {
       // Create new chat
-      const user = mockUsers.find((u) => u.id === userId)
+      const user = contacts.find((u) => u.id === userId)
       if (user) {
         const newChat: Chat = {
           id: `chat-${Date.now()}`,
@@ -506,6 +528,100 @@ export function Messenger() {
     setCurrentScreen("chats")
   }
 
+  const handleArchiveChat = useCallback((chatId: string) => {
+    if (chatId === SAVED_MESSAGES_CHAT_ID) return
+    setArchivedChatIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(chatId)) {
+        next.delete(chatId)
+      } else {
+        next.add(chatId)
+      }
+      return next
+    })
+  }, [activeChat])
+
+  const handleMuteChat = useCallback((chatId: string, duration: string) => {
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId
+          ? { ...chat, muted: duration !== "off" }
+          : chat
+      )
+    )
+  }, [])
+
+  const handleClearHistory = useCallback((chatId: string) => {
+    setMessages((prev) => ({ ...prev, [chatId]: [] }))
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId ? { ...chat, lastMessage: undefined } : chat
+      )
+    )
+  }, [])
+
+  const handleDeleteChat = useCallback((chatId: string) => {
+    const chat = chats.find((c) => c.id === chatId)
+    if (chat && chat.id !== SAVED_MESSAGES_CHAT_ID) {
+      setChatToDelete(chat)
+      setShowDeleteChatModal(true)
+    }
+  }, [chats])
+
+  const handleLeaveChat = useCallback((chatId: string) => {
+    removeChatCompletely(chatId)
+  }, [removeChatCompletely])
+
+  const handleBlockUser = useCallback((chatId: string) => {
+    const chat = chats.find((c) => c.id === chatId)
+    if (!chat || chat.type !== "private") return
+    const otherUser = chat.participants.find((p) => p.id !== currentUser.id)
+    if (otherUser) {
+      setBlockedUserIds((prev) => new Set(prev).add(otherUser.id))
+    }
+    removeChatCompletely(chatId)
+  }, [chats, removeChatCompletely])
+
+  const handleReportChat = useCallback((chatId: string) => {
+    const reportMessage: Message = {
+      id: `msg-${Date.now()}-report`,
+      chatId,
+      senderId: currentUser.id,
+      content: "Report submitted.",
+      timestamp: new Date(),
+      status: "read",
+      type: "system",
+    }
+    setMessages((prev) => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] || []), reportMessage],
+    }))
+  }, [])
+
+  const handleStartCall = useCallback((chatId: string, type: "audio" | "video") => {
+    const chat = chats.find((c) => c.id === chatId)
+    if (!chat) return
+    const otherUser = chat.participants.find((p) => p.id !== currentUser.id)
+    setCalls((prev) => [
+      {
+        id: `call-${Date.now()}`,
+        userId: otherUser?.id || currentUser.id,
+        userName: otherUser?.name || chat.name,
+        direction: "outgoing",
+        status: "answered",
+        timestamp: new Date(),
+      },
+      ...prev,
+    ])
+    setShowCallsModal(true)
+  }, [chats])
+
+  const handleOpenChatInNewWindow = useCallback((chatId: string) => {
+    window.open(`/?chat=${encodeURIComponent(chatId)}`, "_blank", "noopener,noreferrer")
+  }, [])
+
+  const availableContacts = contacts.filter((contact) => !blockedUserIds.has(contact.id))
+
   const selectedChat = activeChat
     ? chats.find((c) => c.id === activeChat)
     : undefined
@@ -515,7 +631,12 @@ export function Messenger() {
   if (currentScreen === "settings") {
     return (
       <div className="h-screen w-full bg-background">
-        <Settings onBack={() => setCurrentScreen("chats")} />
+        <Settings
+          onBack={() => setCurrentScreen("chats")}
+          onLogout={() => {
+            window.location.href = "/login"
+          }}
+        />
       </div>
     )
   }
@@ -524,7 +645,12 @@ export function Messenger() {
   if (currentScreen === "profile") {
     return (
       <div className="h-screen w-full bg-background">
-        <Profile onBack={() => setCurrentScreen("chats")} />
+        <Profile
+          onBack={() => setCurrentScreen("chats")}
+          onLogout={() => {
+            window.location.href = "/login"
+          }}
+        />
       </div>
     )
   }
@@ -544,15 +670,19 @@ export function Messenger() {
       <NewChatDialog
         isOpen={showNewChat}
         onClose={() => setShowNewChat(false)}
-        contacts={mockUsers}
+        contacts={availableContacts}
         onSelectContact={handleSelectContact}
+        onAddContact={() => {
+          setShowNewChat(false)
+          setShowAddContactModal(true)
+        }}
       />
 
       {/* New Group Dialog */}
       <NewGroupDialog
         isOpen={showNewGroup}
         onClose={() => setShowNewGroup(false)}
-        contacts={mockUsers}
+        contacts={availableContacts}
         onCreateGroup={handleCreateGroup}
       />
 
@@ -560,7 +690,7 @@ export function Messenger() {
       <NewChannelDialog
         isOpen={showNewChannel}
         onClose={() => setShowNewChannel(false)}
-        contacts={mockUsers}
+        contacts={availableContacts}
         onCreateChannel={handleCreateChannel}
       />
 
@@ -568,7 +698,7 @@ export function Messenger() {
       <ContactsModal
         isOpen={showContactsModal}
         onClose={() => setShowContactsModal(false)}
-        contacts={mockUsers}
+        contacts={availableContacts}
         onSelectContact={handleSelectContact}
         onAddContact={() => {
           setShowContactsModal(false)
@@ -588,15 +718,25 @@ export function Messenger() {
         isOpen={showCallsModal}
         onClose={() => setShowCallsModal(false)}
         calls={calls}
-        contacts={mockUsers}
+        contacts={availableContacts}
         onStartNewCall={() => {
-          setShowCallsModal(false)
-          // In a real app, this would open a call interface
-          console.log("Start new call")
+          if (activeChat) {
+            handleStartCall(activeChat, "audio")
+          }
         }}
         onCallContact={(userId) => {
-          // In a real app, this would initiate a call
-          console.log("Call contact:", userId)
+          const existingPrivateChat = chats.find(
+            (chat) => chat.type === "private" && chat.participants.some((p) => p.id === userId)
+          )
+          if (existingPrivateChat) {
+            handleStartCall(existingPrivateChat.id, "audio")
+            return
+          }
+          handleSelectContact(userId)
+        }}
+        onDeleteAllCalls={() => setCalls([])}
+        onDeleteSelectedCalls={(callIds) => {
+          setCalls((prev) => prev.filter((call) => !callIds.includes(call.id)))
         }}
       />
 
@@ -610,18 +750,7 @@ export function Messenger() {
         }}
         onConfirm={(deleteForBoth) => {
           if (chatToDelete) {
-            // Remove chat from list (but preserve Saved Messages)
-            setChats((prev) => prev.filter((chat) => chat.id !== chatToDelete.id && chat.id !== SAVED_MESSAGES_CHAT_ID))
-            // Clear messages
-            setMessages((prev) => {
-              const newMessages = { ...prev }
-              delete newMessages[chatToDelete.id]
-              return newMessages
-            })
-            // Close chat if it was active
-            if (activeChat === chatToDelete.id) {
-              setActiveChat(undefined)
-            }
+            removeChatCompletely(chatToDelete.id)
           }
           setShowDeleteChatModal(false)
           setChatToDelete(null)
@@ -650,16 +779,13 @@ export function Messenger() {
       >
         <ChatList
           chats={chats}
+          archivedChatIds={archivedChatIds}
           activeChat={activeChat}
           onSelectChat={handleSelectChat}
           onMenuClick={() => setShowMenu(true)}
           onNewChat={() => setShowNewChat(true)}
-          onOpenInNewWindow={(chatId) => {
-            console.log("Open in new window:", chatId)
-          }}
-          onArchive={(chatId) => {
-            console.log("Archive chat:", chatId)
-          }}
+          onOpenInNewWindow={handleOpenChatInNewWindow}
+          onArchive={handleArchiveChat}
           onPin={(chatId) => {
             setChats((prev) =>
               prev.map((chat) =>
@@ -667,14 +793,7 @@ export function Messenger() {
               )
             )
           }}
-          onMute={(chatId, duration) => {
-            setChats((prev) =>
-              prev.map((chat) =>
-                chat.id === chatId ? { ...chat, muted: true } : chat
-              )
-            )
-            console.log("Mute chat:", chatId, duration)
-          }}
+          onMute={handleMuteChat}
           onMarkAsRead={(chatId) => {
             setChats((prev) =>
               prev.map((chat) =>
@@ -682,23 +801,9 @@ export function Messenger() {
               )
             )
           }}
-          onBlockUser={(chatId) => {
-            console.log("Block user:", chatId)
-          }}
-          onClearHistory={(chatId) => {
-            setMessages((prev) => {
-              const newMessages = { ...prev }
-              delete newMessages[chatId]
-              return newMessages
-            })
-          }}
-          onDelete={(chatId) => {
-            const chat = chats.find((c) => c.id === chatId)
-            if (chat && chat.id !== SAVED_MESSAGES_CHAT_ID) {
-              setChatToDelete(chat)
-              setShowDeleteChatModal(true)
-            }
-          }}
+          onBlockUser={handleBlockUser}
+          onClearHistory={handleClearHistory}
+          onDelete={handleDeleteChat}
           className="w-full"
         />
       </div>
@@ -721,6 +826,12 @@ export function Messenger() {
             onDeleteMessage={handleDeleteMessage}
             onPinMessage={handlePinMessage}
             onForwardMessage={handleForwardMessage}
+            onStartCall={handleStartCall}
+            onMuteChat={handleMuteChat}
+            onClearChatHistory={handleClearHistory}
+            onDeleteChat={handleDeleteChat}
+            onLeaveChat={handleLeaveChat}
+            onReportChat={handleReportChat}
             className="w-full"
           />
         ) : (

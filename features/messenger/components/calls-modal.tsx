@@ -29,6 +29,8 @@ interface CallsModalProps {
   contacts: User[]
   onStartNewCall?: () => void
   onCallContact?: (userId: string) => void
+  onDeleteAllCalls?: () => void
+  onDeleteSelectedCalls?: (callIds: string[]) => void
 }
 
 function formatCallTime(date: Date): string {
@@ -79,6 +81,8 @@ export function CallsModal({
   contacts,
   onStartNewCall,
   onCallContact,
+  onDeleteAllCalls,
+  onDeleteSelectedCalls,
 }: CallsModalProps) {
   const [selectedCalls, setSelectedCalls] = useState<Set<string>>(new Set())
 
@@ -97,14 +101,13 @@ export function CallsModal({
   }
 
   const handleDeleteAll = () => {
-    // In a real app, this would delete all calls
-    console.log("Delete all calls")
+    onDeleteAllCalls?.()
     setSelectedCalls(new Set())
   }
 
   const handleDeleteSelected = () => {
-    // In a real app, this would delete selected calls
-    console.log("Delete selected calls:", Array.from(selectedCalls))
+    if (selectedCalls.size === 0) return
+    onDeleteSelectedCalls?.(Array.from(selectedCalls))
     setSelectedCalls(new Set())
   }
 

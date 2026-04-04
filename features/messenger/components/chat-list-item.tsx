@@ -76,7 +76,7 @@ export function ChatListItem({
         onContextMenu={handleContextMenu}
         style={{ fontFamily: "var(--font-sans)" }}
         className={cn(
-          "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all duration-150 rounded-lg backdrop-blur-sm bg-opacity-80",
+          "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 rounded-lg bg-opacity-80",
           isActive 
             ? "bg-primary text-primary-foreground" 
             : "hover:bg-accent/20 active:bg-accent/30"

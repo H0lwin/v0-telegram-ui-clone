@@ -22,6 +22,7 @@ import type { Message } from "@/lib/types"
 interface MessageComposerProps {
   onSend: (content: string, replyTo?: { messageId: string; content: string; senderName: string }, editingMessageId?: string) => void
   onAttachment?: (type: string) => void
+  onRecordVoice?: () => void
   placeholder?: string
   disabled?: boolean
   replyingTo?: Message & { senderName?: string }
@@ -42,6 +43,7 @@ const attachmentOptions = [
 export function MessageComposer({
   onSend,
   onAttachment,
+  onRecordVoice,
   placeholder = "Message",
   disabled,
   replyingTo,
@@ -276,6 +278,7 @@ export function MessageComposer({
           </button>
         ) : (
           <button
+            onClick={onRecordVoice}
             className="p-2.5 rounded-full hover:bg-accent transition-colors flex-shrink-0"
             aria-label="Voice message"
           >

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { X, Search, Camera, Check, Copy, CheckCheck } from "lucide-react"
 import { Avatar } from "./avatar"
@@ -35,6 +35,7 @@ export function NewChannelDialog({
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
   const [linkCopied, setLinkCopied] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
 
@@ -103,10 +104,20 @@ export function NewChannelDialog({
   }
 
   const handleAvatarClick = () => {
-    const url = prompt("Enter image URL (or leave empty for default):")
-    if (url !== null) {
-      setChannelAvatar(url || undefined)
+    fileInputRef.current?.click()
+  }
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setChannelAvatar(reader.result)
+      }
     }
+    reader.readAsDataURL(file)
   }
 
   const handleCopyLink = async () => {
@@ -159,6 +170,13 @@ export function NewChannelDialog({
                     name={channelName || "Channel"} 
                     src={channelAvatar}
                     size="xl" 
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
                   />
                   <button
                     onClick={handleAvatarClick}

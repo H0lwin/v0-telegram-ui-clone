@@ -10,9 +10,10 @@ interface ContactsProps {
   contacts: User[]
   onBack: () => void
   onSelectContact: (userId: string) => void
+  onAddContact?: () => void
 }
 
-export function Contacts({ contacts, onBack, onSelectContact }: ContactsProps) {
+export function Contacts({ contacts, onBack, onSelectContact, onAddContact }: ContactsProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
   const filteredContacts = contacts.filter((contact) =>
@@ -40,7 +41,7 @@ export function Contacts({ contacts, onBack, onSelectContact }: ContactsProps) {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="text-lg font-semibold flex-1">Contacts</h1>
-        <button className="p-2 rounded-full hover:bg-accent transition-colors">
+        <button onClick={onAddContact} className="p-2 rounded-full hover:bg-accent transition-colors">
           <UserPlus className="h-5 w-5 text-muted-foreground" />
         </button>
       </div>

@@ -45,7 +45,7 @@ function HeaderButton({
     <button
       {...props}
       className={cn(
-        "p-2 rounded-full transition-all",
+        "p-2 rounded-full transition-colors",
         "hover:bg-accent/60 active:scale-95",
         className
       )}
@@ -80,10 +80,37 @@ interface ChatHeaderProps {
   chat: Chat
   onBack?: () => void
   onInfoClick?: () => void
+  onSearch?: () => void
+  onStartCall?: (type: "audio" | "video") => void
+  onMute?: (duration: string) => void
+  onSetWallpaper?: () => void
+  onExportHistory?: () => void
+  onClearHistory?: () => void
+  onDeleteChat?: () => void
+  onBoost?: () => void
+  onSelectMessages?: () => void
+  onReport?: () => void
+  onLeave?: () => void
   className?: string
 }
 
-export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderProps) {
+export function ChatHeader({
+  chat,
+  onBack,
+  onInfoClick,
+  onSearch,
+  onStartCall,
+  onMute,
+  onSetWallpaper,
+  onExportHistory,
+  onClearHistory,
+  onDeleteChat,
+  onBoost,
+  onSelectMessages,
+  onReport,
+  onLeave,
+  className,
+}: ChatHeaderProps) {
   const participant = chat.participants.find((p) => p.id !== "user-1")
   const isOnline = chat.type === "private" ? participant?.online : undefined
   const isTyping = chat.typing && chat.typing.length > 0
@@ -122,7 +149,7 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
     <div
       className={cn(
         "flex items-center gap-2 px-2 py-2",
-        "bg-card/80 backdrop-blur-xl border-b border-border/60",
+        "bg-card border-b border-border/60",
         className
       )}
     >
@@ -152,15 +179,15 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
 
       {/* Actions */}
       <div className="flex items-center gap-1">
-        <HeaderButton className="hidden sm:flex">
+        <HeaderButton onClick={onSearch} className="hidden sm:flex">
           <Search className="h-5 w-5 text-muted-foreground" />
         </HeaderButton>
 
-        <HeaderButton className="hidden sm:flex">
+        <HeaderButton onClick={() => onStartCall?.("audio")} className="hidden sm:flex">
           <Phone className="h-5 w-5 text-muted-foreground" />
         </HeaderButton>
 
-        <HeaderButton className="hidden md:flex">
+        <HeaderButton onClick={() => onStartCall?.("video")} className="hidden md:flex">
           <Video className="h-5 w-5 text-muted-foreground" />
         </HeaderButton>
 
@@ -174,7 +201,7 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
 
           <DropdownMenuContent
             align="end"
-            className="w-56 backdrop-blur-xl bg-popover/80 border border-border/60"
+            className="w-56 bg-popover border border-border/60"
           >
             {chat.type === "private" && (
               <>
@@ -184,12 +211,12 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
                     <span>Mute notifications</span>
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
-                    <DropdownMenuItem>1 hour</DropdownMenuItem>
-                    <DropdownMenuItem>4 hours</DropdownMenuItem>
-                    <DropdownMenuItem>8 hours</DropdownMenuItem>
-                    <DropdownMenuItem>24 hours</DropdownMenuItem>
-                    <DropdownMenuItem>1 week</DropdownMenuItem>
-                    <DropdownMenuItem>Forever</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onMute?.("1h")}>1 hour</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onMute?.("4h")}>4 hours</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onMute?.("8h")}>8 hours</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onMute?.("24h")}>24 hours</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onMute?.("7d")}>1 week</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onMute?.("always")}>Forever</DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
 
@@ -198,24 +225,24 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
                   View profile
                 </DropdownMenuItem>
 
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={onSetWallpaper}>
                   <ImageIcon className="mr-2 h-4 w-4" />
                   Set wallpaper
                 </DropdownMenuItem>
 
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportHistory}>
                   <Download className="mr-2 h-4 w-4" />
                   Export chat history
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={onClearHistory} className="text-destructive focus:text-destructive">
                   <History className="mr-2 h-4 w-4" />
                   Clear history
                 </DropdownMenuItem>
 
-                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={onDeleteChat} className="text-destructive focus:text-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete chat
                 </DropdownMenuItem>
@@ -224,29 +251,29 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
 
             {chat.type === "group" && (
               <>
-                <DropdownMenuItem>
-                  <Rocket className="mr-2 h-4 w-4 text-purple-500" />
+                <DropdownMenuItem onClick={onBoost}>
+                  <Rocket className="mr-2 h-4 w-4 text-primary" />
                   Boost group
                 </DropdownMenuItem>
 
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMute?.("always")}>
                   <BellOff className="mr-2 h-4 w-4" />
                   Mute
                 </DropdownMenuItem>
 
-                <DropdownMenuItem className="hidden lg:flex">
+                <DropdownMenuItem onClick={onSelectMessages} className="hidden lg:flex">
                   <CheckSquare className="mr-2 h-4 w-4" />
                   Select messages
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={onReport}>
                   <Flag className="mr-2 h-4 w-4" />
                   Report
                 </DropdownMenuItem>
 
-                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={onLeave} className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Leave group
                 </DropdownMenuItem>
@@ -255,7 +282,7 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
 
             {chat.type === "channel" && (
               <>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMute?.("always")}>
                   <BellOff className="mr-2 h-4 w-4" />
                   Mute
                 </DropdownMenuItem>
@@ -265,19 +292,19 @@ export function ChatHeader({ chat, onBack, onInfoClick, className }: ChatHeaderP
                   View channel info
                 </DropdownMenuItem>
 
-                <DropdownMenuItem>
-                  <Rocket className="mr-2 h-4 w-4 text-purple-500" />
+                <DropdownMenuItem onClick={onBoost}>
+                  <Rocket className="mr-2 h-4 w-4 text-primary" />
                   Boost channel
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={onReport}>
                   <Flag className="mr-2 h-4 w-4" />
                   Report
                 </DropdownMenuItem>
 
-                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={onLeave} className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Leave channel
                 </DropdownMenuItem>

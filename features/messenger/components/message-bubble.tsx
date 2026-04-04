@@ -94,8 +94,7 @@ export function MessageBubble({
 
   const handleCopy = () => {
     if (message.type === "image" || message.attachments?.some(a => a.type === "image")) {
-      // Copy image logic would go here
-      console.log("Copy image")
+      handleCopyImage()
     } else if (message.type === "file" || message.attachments?.some(a => a.type === "file")) {
       // Copy filename
       const file = message.attachments?.find(a => a.type === "file")

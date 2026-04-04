@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { Avatar } from "./avatar"
-import { 
+import {
   X,
   Bookmark,
   Users,
@@ -13,7 +13,7 @@ import {
   User,
   Plus,
   ChevronUp,
-  Megaphone
+  Megaphone,
 } from "lucide-react"
 
 interface SidebarMenuProps {
@@ -33,9 +33,9 @@ interface Account {
   badge?: string
 }
 
-const mockAccounts: Account[] = [
+const initialAccounts: Account[] = [
   { id: "1", name: "H0lwin", active: true, badge: "78.3K" },
-  { id: "2", name: "H0lwin" },
+  { id: "2", name: "H0lwin Alt" },
 ]
 
 const menuItems = [
@@ -48,6 +48,8 @@ const menuItems = [
   { icon: Settings, label: "Settings", screen: "settings" },
 ]
 
+const emojiStatuses = ["🙂", "🚀", "🔥", "🎯", "😎"]
+
 export function SidebarMenu({
   isOpen,
   onClose,
@@ -57,6 +59,8 @@ export function SidebarMenu({
   className,
 }: SidebarMenuProps) {
   const [shouldRender, setShouldRender] = useState(isOpen)
+  const [accounts, setAccounts] = useState<Account[]>(initialAccounts)
+  const [statusIdx, setStatusIdx] = useState(0)
 
   useEffect(() => {
     if (isOpen) {
@@ -74,7 +78,6 @@ export function SidebarMenu({
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className={cn(
           "fixed inset-0 bg-black/50 z-40 transition-opacity duration-200",
@@ -83,7 +86,6 @@ export function SidebarMenu({
         onClick={onClose}
       />
 
-      {/* Menu Panel */}
       <div
         className={cn(
           "fixed left-0 top-0 bottom-0 w-72 bg-sidebar z-50 flex flex-col shadow-xl",
@@ -93,14 +95,16 @@ export function SidebarMenu({
         )}
         onAnimationEnd={handleAnimationEnd}
       >
-        {/* User Profile Section */}
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-3 mb-3">
             <Avatar name="H0lwin" size="lg" />
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-sidebar-foreground truncate">H0lwin</h3>
-              <button className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                <span>Set Emoji Status</span>
+              <button
+                onClick={() => setStatusIdx((prev) => (prev + 1) % emojiStatuses.length)}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>Set Emoji Status {emojiStatuses[statusIdx]}</span>
                 <ChevronUp className="h-3 w-3" />
               </button>
             </div>
@@ -114,13 +118,14 @@ export function SidebarMenu({
           </div>
         </div>
 
-        {/* Account List */}
         <div className="border-b border-sidebar-border py-2">
-          {mockAccounts.map((account) => (
+          {accounts.map((account) => (
             <button
               key={account.id}
               onClick={() => {
-                // Handle account switch
+                setAccounts((prev) =>
+                  prev.map((item) => ({ ...item, active: item.id === account.id }))
+                )
               }}
               className={cn(
                 "flex items-center gap-3 w-full px-4 py-2.5 hover:bg-sidebar-accent transition-colors",
@@ -143,7 +148,8 @@ export function SidebarMenu({
           <button
             className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-sidebar-accent transition-colors"
             onClick={() => {
-              // Handle add account
+              const name = `Account ${accounts.length + 1}`
+              setAccounts((prev) => [...prev, { id: `acc-${Date.now()}`, name }])
             }}
           >
             <div className="h-10 w-10 rounded-full bg-sidebar-accent flex items-center justify-center border-2 border-dashed border-sidebar-border">
@@ -155,7 +161,6 @@ export function SidebarMenu({
           </button>
         </div>
 
-        {/* Menu Items */}
         <div className="flex-1 overflow-y-auto py-2">
           {menuItems.map((item) => (
             <button
@@ -173,7 +178,6 @@ export function SidebarMenu({
 
           <div className="border-t border-sidebar-border my-2" />
 
-          {/* Night Mode Toggle */}
           <button
             onClick={onToggleDarkMode}
             className="flex items-center justify-between w-full px-4 py-3 hover:bg-sidebar-accent transition-colors"
@@ -190,7 +194,7 @@ export function SidebarMenu({
             >
               <div
                 className={cn(
-                  "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200",
+                  "absolute top-0.5 left-0.5 w-5 h-5 bg-card rounded-full shadow-sm transition-transform duration-200",
                   darkMode && "translate-x-5"
                 )}
               />
@@ -198,7 +202,6 @@ export function SidebarMenu({
           </button>
         </div>
 
-        {/* Footer */}
         <div className="border-t border-sidebar-border px-4 py-3">
           <p className="text-xs text-muted-foreground text-center">
             Telegram Desktop

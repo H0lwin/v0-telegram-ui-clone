@@ -152,7 +152,7 @@ export function ChatContextMenu({
             className="flex items-center gap-3 w-full px-4 py-2.5 text-sm hover:bg-accent transition-colors"
           >
             <Pin className="h-4 w-4 text-muted-foreground" />
-            <span>Pin</span>
+            <span>{chat.pinned ? "Unpin" : "Pin"}</span>
           </button>
         )}
 
