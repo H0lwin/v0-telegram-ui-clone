@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import type { Chat } from "@/lib/types"
 import { ChatListItem } from "./chat-list-item"
 import { Menu, Search, X, Edit } from "lucide-react"
+import { AudioPlayerStrip, type ActiveAudioTrack } from "./audio-player-strip"
 
 interface ChatListProps {
   chats: Chat[]
@@ -21,6 +22,15 @@ interface ChatListProps {
   onBlockUser?: (chatId: string) => void
   onClearHistory?: (chatId: string) => void
   onDelete?: (chatId: string) => void
+  activeTrack?: ActiveAudioTrack
+  isAudioPlaying?: boolean
+  audioProgress?: number
+  audioDuration?: number
+  onToggleAudioPlayback?: () => void
+  onPrevTrack?: () => void
+  onNextTrack?: () => void
+  onOpenAudioQueue?: () => void
+  onOpenAudioDetails?: () => void
   className?: string
 }
 
@@ -39,6 +49,15 @@ export function ChatList({
   onBlockUser,
   onClearHistory,
   onDelete,
+  activeTrack,
+  isAudioPlaying,
+  audioProgress,
+  audioDuration,
+  onToggleAudioPlayback,
+  onPrevTrack,
+  onNextTrack,
+  onOpenAudioQueue,
+  onOpenAudioDetails,
   className,
 }: ChatListProps) {
   const [searchQuery, setSearchQuery] = useState("")
@@ -86,6 +105,18 @@ export function ChatList({
           )}
         </div>
       </div>
+
+      <AudioPlayerStrip
+        track={activeTrack}
+        isPlaying={Boolean(isAudioPlaying)}
+        progress={audioProgress || 0}
+        duration={audioDuration || 0}
+        onTogglePlay={() => onToggleAudioPlayback?.()}
+        onPrev={() => onPrevTrack?.()}
+        onNext={() => onNextTrack?.()}
+        onOpenQueue={() => onOpenAudioQueue?.()}
+        onOpenDetails={() => onOpenAudioDetails?.()}
+      />
 
       {/* Chat List */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">

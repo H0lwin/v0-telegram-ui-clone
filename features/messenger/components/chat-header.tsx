@@ -183,11 +183,11 @@ export function ChatHeader({
           <Search className="h-5 w-5 text-muted-foreground" />
         </HeaderButton>
 
-        <HeaderButton onClick={() => onStartCall?.("audio")} className="hidden sm:flex">
+        <HeaderButton onClick={() => onStartCall?.("audio")}>
           <Phone className="h-5 w-5 text-muted-foreground" />
         </HeaderButton>
 
-        <HeaderButton onClick={() => onStartCall?.("video")} className="hidden md:flex">
+        <HeaderButton onClick={() => onStartCall?.("video")} className="hidden sm:flex">
           <Video className="h-5 w-5 text-muted-foreground" />
         </HeaderButton>
 

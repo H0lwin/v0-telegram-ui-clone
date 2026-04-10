@@ -329,4 +329,51 @@ export const mockMessages: Record<string, Message[]> = {
       type: "text",
     },
   ],
+  "chat-4": [
+    {
+      id: "m4-1",
+      chatId: "chat-4",
+      senderId: "user-7",
+      content: "Daily digest is ready. Watch this short clip:",
+      timestamp: new Date(Date.now() - 1000 * 60 * 40),
+      status: "read",
+      type: "video",
+      attachments: [
+        {
+          id: "att-v-1",
+          type: "video",
+          url: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4",
+          name: "daily-digest.mp4",
+          size: 4_500_000,
+          duration: 5,
+          poster:
+            "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=960&q=80",
+          downloadable: true,
+          streamable: true,
+        },
+      ],
+    },
+    {
+      id: "m4-2",
+      chatId: "chat-4",
+      senderId: "user-7",
+      content: "Background track for today's post",
+      timestamp: new Date(Date.now() - 1000 * 60 * 18),
+      status: "read",
+      type: "audio",
+      attachments: [
+        {
+          id: "att-a-1",
+          type: "audio",
+          url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+          name: "SoundHelix-Song-1.mp3",
+          artist: "Tech News",
+          duration: 373,
+          mimeType: "audio/mpeg",
+          downloadable: true,
+          streamable: true,
+        },
+      ],
+    },
+  ],
 }

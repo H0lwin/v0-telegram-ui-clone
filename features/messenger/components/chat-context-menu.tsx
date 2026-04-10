@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { cn } from "@/lib/utils"
 import { 
   Maximize2,
   Archive,
@@ -12,15 +11,6 @@ import {
   Trash2,
   ChevronRight
 } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import type { Chat } from "@/lib/types"
 
 interface ChatContextMenuProps {
@@ -171,7 +161,7 @@ export function ChatContextMenu({
             </button>
             {muteMenuOpen && (
               <div 
-                className="absolute left-full top-0 ml-1 bg-card border border-border rounded-xl shadow-xl min-w-[180px] z-50"
+                className="absolute right-2 top-full mt-1 bg-card border border-border rounded-xl shadow-xl min-w-[180px] z-50 lg:right-auto lg:left-full lg:top-0 lg:mt-0 lg:ml-1"
                 onMouseLeave={() => setMuteMenuOpen(false)}
               >
                 {muteDurations.map((duration) => (

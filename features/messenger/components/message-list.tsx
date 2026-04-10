@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import type { Message, User, Chat } from "@/lib/types"
 import { MessageBubble } from "./message-bubble"
 import { TypingIndicator } from "./typing-indicator"
+import { ChevronDown } from "lucide-react"
 
 interface MessageListProps {
   messages: Message[]
@@ -16,6 +17,10 @@ interface MessageListProps {
   onDelete?: (messageId: string) => void
   onPin?: (messageId: string) => void
   onForward?: (message: Message) => void
+  onPlayAudioTrack?: (chatId: string, messageId: string) => void
+  onAddToGifs?: (messageId: string) => void
+  onCancelUpload?: (messageId: string) => void
+  playingMessageId?: string
   onSelect?: (messageId: string) => void
   selectedMessages?: Set<string>
   className?: string
@@ -57,12 +62,17 @@ export function MessageList({
   onDelete,
   onPin,
   onForward,
+  onPlayAudioTrack,
+  onAddToGifs,
+  onCancelUpload,
+  playingMessageId,
   onSelect,
   selectedMessages,
   className,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false)
   const isGroupChat = chat.type === "group"
   const isTyping = chat.typing && chat.typing.length > 0
 
@@ -71,10 +81,26 @@ export function MessageList({
   }, [])
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (!scrollRef.current) return
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    setShowJumpToBottom(false)
+  }, [chat.id])
+
+  useEffect(() => {
+    const node = scrollRef.current
+    if (!node) return
+    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight
+    if (distanceFromBottom < 180) {
+      node.scrollTop = node.scrollHeight
     }
   }, [messages, isTyping])
+
+  const handleScroll = () => {
+    const node = scrollRef.current
+    if (!node) return
+    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight
+    setShowJumpToBottom(distanceFromBottom > 260)
+  }
 
   const getSender = (senderId: string): User | undefined => {
     return chat.participants.find((p) => p.id === senderId)
@@ -83,8 +109,9 @@ export function MessageList({
   return (
     <div
       ref={scrollRef}
+      onScroll={handleScroll}
       className={cn(
-        "flex-1 overflow-y-auto py-2 chat-background scrollbar-thin",
+        "relative flex-1 overflow-y-auto py-2 chat-background scrollbar-thin",
         className
       )}
     >
@@ -131,9 +158,13 @@ export function MessageList({
               onReply={onReply}
               onEdit={onEdit}
               onReact={onReact}
-              onDelete={isOutgoing ? onDelete : undefined}
+              onDelete={onDelete}
               onPin={onPin}
               onForward={onForward}
+              onPlayAudioTrack={onPlayAudioTrack}
+              onAddToGifs={onAddToGifs}
+              onCancelUpload={onCancelUpload}
+              isAudioPlaying={playingMessageId === message.id}
               onSelect={onSelect}
               isSelected={selectedMessages?.has(message.id)}
             />
@@ -147,6 +178,22 @@ export function MessageList({
           names={chat.typing || []} 
           showAvatar={isGroupChat}
         />
+      )}
+
+      {showJumpToBottom && (
+        <div className="sticky bottom-3 flex justify-end px-3 pointer-events-none">
+          <button
+            onClick={() => {
+              if (!scrollRef.current) return
+              scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
+              setShowJumpToBottom(false)
+            }}
+            className="pointer-events-auto rounded-full bg-primary p-2 text-primary-foreground shadow-lg hover:bg-primary/90"
+            aria-label="Jump to latest message"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
       )}
     </div>
   )

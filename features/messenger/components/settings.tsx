@@ -52,6 +52,13 @@ type Session = {
   active: boolean
 }
 
+type SettingsSearchItem = {
+  key: string
+  title: string
+  subtitle: string
+  action: () => void
+}
+
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -149,6 +156,8 @@ export function Settings({ onBack, onLogout, className }: SettingsProps) {
 
   const [activeSection, setActiveSection] = useState<Section | null>(null)
   const [helpItem, setHelpItem] = useState<string | null>(null)
+  const [showSearchModal, setShowSearchModal] = useState(false)
+  const [settingsSearchQuery, setSettingsSearchQuery] = useState("")
 
   const [messagePreview, setMessagePreview] = useState(true)
   const [inAppSounds, setInAppSounds] = useState(true)
@@ -183,6 +192,31 @@ export function Settings({ onBack, onLogout, className }: SettingsProps) {
 
   const storagePercent = useMemo(() => Math.min(100, Math.round((cacheMb / 1024) * 100)), [cacheMb])
 
+  const searchItems: SettingsSearchItem[] = useMemo(
+    () => [
+      { key: "notifications", title: "Notifications and Sounds", subtitle: "Message alerts, sounds, vibration", action: () => setActiveSection("notifications") },
+      { key: "privacy", title: "Privacy and Security", subtitle: "Last seen, profile visibility, passcode", action: () => setActiveSection("privacy") },
+      { key: "storage", title: "Data and Storage", subtitle: "Auto-download and cache cleanup", action: () => setActiveSection("storage") },
+      { key: "appearance", title: "Appearance", subtitle: "Theme, compact mode, font size", action: () => setActiveSection("appearance") },
+      { key: "chats", title: "Chats and Folders", subtitle: "Folders and chat organization", action: () => setActiveSection("chats") },
+      { key: "network", title: "Network and Sync", subtitle: "Proxy and sync controls", action: () => setActiveSection("network") },
+      { key: "devices", title: "Devices", subtitle: "Active sessions and termination", action: () => setActiveSection("devices") },
+      { key: "language", title: "Language", subtitle: "App language", action: () => setActiveSection("language") },
+      { key: "phone", title: "Phone Number", subtitle: "Change phone number", action: () => setShowPhoneModal(true) },
+      { key: "username", title: "Username", subtitle: "Edit username", action: () => setShowUsernameModal(true) },
+      { key: "bio", title: "Bio", subtitle: "Edit biography", action: () => setShowBioModal(true) },
+      { key: "name", title: "Display Name", subtitle: "Edit account name", action: () => setShowNameModal(true) },
+      { key: "faq", title: "FAQ", subtitle: "Common questions and answers", action: () => setHelpItem("FAQ") },
+    ],
+    []
+  )
+
+  const filteredSearchItems = useMemo(() => {
+    const q = settingsSearchQuery.trim().toLowerCase()
+    if (!q) return searchItems
+    return searchItems.filter((item) => `${item.title} ${item.subtitle}`.toLowerCase().includes(q))
+  }, [settingsSearchQuery, searchItems])
+
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -204,7 +238,10 @@ export function Settings({ onBack, onLogout, className }: SettingsProps) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveSection("help")}
+            onClick={() => {
+              setShowSearchModal(true)
+              setSettingsSearchQuery("")
+            }}
             className="p-2 rounded-full hover:bg-accent transition-colors"
             aria-label="Search settings"
           >
@@ -529,6 +566,36 @@ export function Settings({ onBack, onLogout, className }: SettingsProps) {
       {helpItem && (
         <OverlayModal title={helpItem} onClose={() => setHelpItem(null)}>
           <p className="text-sm text-muted-foreground">{helpContent[helpItem]}</p>
+        </OverlayModal>
+      )}
+
+      {showSearchModal && (
+        <OverlayModal title="Search Settings" onClose={() => setShowSearchModal(false)}>
+          <input
+            autoFocus
+            value={settingsSearchQuery}
+            onChange={(e) => setSettingsSearchQuery(e.target.value)}
+            placeholder="Search settings..."
+            className="w-full p-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <div className="max-h-72 space-y-1 overflow-y-auto pr-1 scrollbar-thin">
+            {filteredSearchItems.map((item) => (
+              <button
+                key={item.key}
+                onClick={() => {
+                  setShowSearchModal(false)
+                  item.action()
+                }}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-left hover:bg-accent transition-colors"
+              >
+                <p className="text-sm font-medium text-foreground">{item.title}</p>
+                <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+              </button>
+            ))}
+            {filteredSearchItems.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">No matching settings found.</p>
+            )}
+          </div>
         </OverlayModal>
       )}
     </div>

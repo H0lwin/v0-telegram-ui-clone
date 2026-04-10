@@ -13,7 +13,7 @@ export interface Message {
   content: string
   timestamp: Date
   status: 'sending' | 'sent' | 'delivered' | 'read'
-  type: 'text' | 'image' | 'video' | 'voice' | 'file' | 'sticker' | 'system'
+  type: 'text' | 'photo' | 'image' | 'video' | 'animation' | 'voice' | 'audio' | 'file' | 'sticker' | 'system'
   replyTo?: {
     messageId: string
     content: string
@@ -25,16 +25,28 @@ export interface Message {
   edited?: boolean
   editTimestamp?: Date
   pinned?: boolean
+  viewOnce?: boolean
+  autoDeleteSeconds?: number
 }
 
 export interface Attachment {
   id: string
-  type: 'image' | 'video' | 'file' | 'voice'
+  type: 'photo' | 'image' | 'video' | 'animation' | 'file' | 'voice' | 'audio'
   url: string
   name?: string
   size?: number
   duration?: number
   thumbnail?: string
+  mimeType?: string
+  poster?: string
+  artist?: string
+  downloadable?: boolean
+  streamable?: boolean
+  loop?: boolean
+  muted?: boolean
+  uploadProgress?: number
+  mediaKind?: string
+  favorite?: boolean
 }
 
 export interface Chat {

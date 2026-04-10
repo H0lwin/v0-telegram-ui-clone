@@ -2,11 +2,12 @@
 
 import { useState, useCallback } from "react"
 import { cn } from "@/lib/utils"
-import type { Chat, Message } from "@/lib/types"
+import type { Chat, Message, Attachment } from "@/lib/types"
 import { ChatHeader } from "./chat-header"
 import { MessageList } from "./message-list"
 import { MessageComposer } from "./message-composer"
 import { ChatInfo } from "./chat-info"
+import { X } from "lucide-react"
 
 interface ChatViewProps {
   chat: Chat
@@ -22,7 +23,19 @@ interface ChatViewProps {
   onDeleteMessage?: (messageId: string) => void
   onPinMessage?: (messageId: string) => void
   onForwardMessage?: (message: Message) => void
+  onSendAttachment?: (chatId: string, attachmentType: string) => void
+  onUploadFiles?: (chatId: string, files: File[], sourceType?: string) => void
+  onSendSticker?: (chatId: string, sticker: string) => void
+  gifLibrary?: Attachment[]
+  favoriteGifIds?: Set<string>
+  onSendGifFromLibrary?: (chatId: string, attachmentId: string) => void
+  onToggleFavoriteGif?: (attachmentId: string) => void
+  onDeleteGif?: (attachmentId: string) => void
   onStartCall?: (chatId: string, type: "audio" | "video") => void
+  onPlayAudioTrack?: (chatId: string, messageId: string) => void
+  onAddToGifs?: (chatId: string, messageId: string) => void
+  onCancelUpload?: (chatId: string, messageId: string) => void
+  playingMessageId?: string
   onMuteChat?: (chatId: string, duration: string) => void
   onClearChatHistory?: (chatId: string) => void
   onDeleteChat?: (chatId: string) => void
@@ -41,7 +54,19 @@ export function ChatView({
   onDeleteMessage,
   onPinMessage,
   onForwardMessage,
+  onSendAttachment,
+  onUploadFiles,
+  onSendSticker,
+  gifLibrary,
+  favoriteGifIds,
+  onSendGifFromLibrary,
+  onToggleFavoriteGif,
+  onDeleteGif,
   onStartCall,
+  onPlayAudioTrack,
+  onAddToGifs,
+  onCancelUpload,
+  playingMessageId,
   onMuteChat,
   onClearChatHistory,
   onDeleteChat,
@@ -153,13 +178,25 @@ export function ChatView({
         <div className={cn("flex-1 flex flex-col min-h-0 overflow-hidden", wallpaperClasses[wallpaperVariant])}>
           {searchMode && (
             <div className="px-3 py-2 border-b border-border bg-card/70">
-              <input
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search in messages..."
-                className="w-full rounded-lg bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search in messages..."
+                  className="w-full rounded-lg bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <button
+                  onClick={() => {
+                    setSearchMode(false)
+                    setSearchQuery("")
+                  }}
+                  className="rounded-full p-2 text-muted-foreground hover:bg-accent"
+                  aria-label="Close search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           )}
 
@@ -173,6 +210,10 @@ export function ChatView({
             onDelete={onDeleteMessage}
             onPin={handlePin}
             onForward={handleForward}
+            onPlayAudioTrack={onPlayAudioTrack}
+            onAddToGifs={(messageId) => onAddToGifs?.(chat.id, messageId)}
+            onCancelUpload={(messageId) => onCancelUpload?.(chat.id, messageId)}
+            playingMessageId={playingMessageId}
             onSelect={selectionMode ? handleSelect : undefined}
             selectedMessages={selectedMessages}
             className="flex-1 overflow-y-auto scrollbar-thin"
@@ -180,6 +221,13 @@ export function ChatView({
 
           <MessageComposer
             onSend={handleSendMessage}
+            onUploadFiles={(files, sourceType) => onUploadFiles?.(chat.id, files, sourceType)}
+            onSendSticker={(sticker) => onSendSticker?.(chat.id, sticker)}
+            gifLibrary={gifLibrary || []}
+            favoriteGifIds={favoriteGifIds}
+            onSendGifFromLibrary={(attachment) => onSendGifFromLibrary?.(chat.id, attachment.id)}
+            onToggleFavoriteGif={onToggleFavoriteGif}
+            onDeleteGif={onDeleteGif}
             onRecordVoice={() => onSendMessage("🎤 Voice message")}
             placeholder={`Message ${chat.name}`}
             replyingTo={

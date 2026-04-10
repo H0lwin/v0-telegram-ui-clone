@@ -31,6 +31,7 @@ interface MessageContextMenuProps {
   onSaveAs?: () => void
   onShowInFolder?: () => void
   onReact: (reaction: string) => void
+  onAddToGifs?: () => void
   onDelete?: () => void
   onSelect?: () => void
 }
@@ -65,6 +66,7 @@ export function MessageContextMenu({
   onSaveAs,
   onShowInFolder,
   onReact,
+  onAddToGifs,
   onDelete,
   onSelect,
 }: MessageContextMenuProps) {
@@ -85,8 +87,10 @@ export function MessageContextMenu({
   if (!isOpen) return null
 
   const messageType = message.type
-  const isImage = messageType === "image" || (message.attachments?.some(a => a.type === "image"))
+  const isImage = messageType === "image" || messageType === "photo" || (message.attachments?.some(a => a.type === "image" || a.type === "photo"))
   const isFile = messageType === "file" || (message.attachments?.some(a => a.type === "file"))
+  const mediaForGif = message.attachments?.find((a) => a.type === "image" || a.type === "photo" || a.type === "video")
+  const canAddToGifs = Boolean(onAddToGifs && mediaForGif && (mediaForGif.size || 0) <= 5 * 1024 * 1024)
 
   const handleReaction = (reaction: string) => {
     onReact(reaction)
@@ -124,6 +128,9 @@ export function MessageContextMenu({
         break
       case "delete":
         onDelete?.()
+        break
+      case "addToGifs":
+        onAddToGifs?.()
         break
       case "select":
         onSelect?.()
@@ -267,6 +274,16 @@ export function MessageContextMenu({
             <Forward className="h-4 w-4 text-muted-foreground" />
             <span>Forward</span>
           </button>
+
+          {canAddToGifs && (
+            <button
+              onClick={() => handleAction("addToGifs")}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+            >
+              <Save className="h-4 w-4 text-muted-foreground" />
+              <span>Add to GIFs</span>
+            </button>
+          )}
 
           {onDelete && (
             <button

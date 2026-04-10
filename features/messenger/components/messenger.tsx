@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { cn } from "@/lib/utils"
 import type { Chat, Message, User } from "@/lib/types"
 import { mockChats, mockMessages, currentUser, mockUsers } from "@/lib/mock-data"
@@ -19,8 +19,26 @@ import { NewGroupDialog } from "./new-group-dialog"
 import { NewChannelDialog } from "./new-channel-dialog"
 import { DeleteChatModal } from "./delete-chat-modal"
 import { ForwardMessageDialog } from "./forward-message-dialog"
+import { CallScreen } from "./call-screen"
+import { AudioQueueModal } from "./audio-queue-modal"
+import { AudioPlayerStrip, type ActiveAudioTrack } from "./audio-player-strip"
+import { AudioPlayerDetailsModal } from "./audio-player-details-modal"
+import { MediaEditorModal } from "./media-editor-modal"
+import {
+  createAttachmentFromFile,
+  createMediaMessage,
+  convertGifToTelegramAnimation,
+  simulateChunkedUpload,
+  applyImageEditorPayload,
+  trimVideoFile,
+  type MediaEditorPayload,
+} from "../lib/media-upload"
 
 type Screen = "chats" | "settings" | "contacts" | "profile"
+type CallSession = {
+  chatId: string
+  type: "audio" | "video"
+}
 
 // Mock calls data
 const mockCalls: Call[] = [
@@ -87,6 +105,24 @@ const ensureSavedMessages = (chatList: Chat[]): Chat[] => {
   return [savedMessagesChat, ...otherChats]
 }
 
+const isAudioAttachment = (attachment: NonNullable<Message["attachments"]>[number]) => {
+  if (attachment.type === "audio" || attachment.type === "voice") return true
+  if (attachment.mimeType?.startsWith("audio/")) return true
+  return Boolean(attachment.name?.match(/\.(mp3|wav|m4a|ogg|flac)$/i))
+}
+
+const getTrackFromMessage = (message: Message): ActiveAudioTrack | null => {
+  const attachment = message.attachments?.find((item) => isAudioAttachment(item))
+  if (!attachment) return null
+  return {
+    id: `${message.id}-${attachment.id}`,
+    chatId: message.chatId,
+    messageId: message.id,
+    title: attachment.name || message.content || "Audio",
+    artist: attachment.artist,
+  }
+}
+
 // Simulated bot responses
 const botResponses = [
   "That's interesting! Tell me more.",
@@ -125,6 +161,25 @@ export function Messenger() {
   const [isMobile, setIsMobile] = useState(false)
   const [archivedChatIds, setArchivedChatIds] = useState<Set<string>>(new Set())
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set())
+  const [activeCall, setActiveCall] = useState<CallSession | null>(null)
+  const [audioQueue, setAudioQueue] = useState<ActiveAudioTrack[]>([])
+  const [currentAudioIndex, setCurrentAudioIndex] = useState<number>(-1)
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false)
+  const [audioProgress, setAudioProgress] = useState(0)
+  const [audioDuration, setAudioDuration] = useState(0)
+  const [showAudioQueue, setShowAudioQueue] = useState(false)
+  const [showAudioDetails, setShowAudioDetails] = useState(false)
+  const [audioPlaybackRate, setAudioPlaybackRate] = useState(1)
+  const [audioShuffle, setAudioShuffle] = useState(false)
+  const [audioReverse, setAudioReverse] = useState(false)
+  const [audioRepeatMode, setAudioRepeatMode] = useState<"off" | "one" | "all">("off")
+  const [audioPlayScope, setAudioPlayScope] = useState<"all" | "single">("all")
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [gifLibrary, setGifLibrary] = useState<NonNullable<Message["attachments"]>[number][]>([])
+  const [favoriteGifIds, setFavoriteGifIds] = useState<Set<string>>(new Set())
+  const [editorFile, setEditorFile] = useState<File | null>(null)
+  const [editorChatId, setEditorChatId] = useState<string | null>(null)
+  const uploadCancelIdsRef = useRef<Set<string>>(new Set())
 
   // Wrapper to ensure Saved Messages is never removed
   const setChats = (updater: Chat[] | ((prev: Chat[]) => Chat[])) => {
@@ -163,6 +218,104 @@ export function Messenger() {
       setCurrentScreen("chats")
     }
   }, [chats])
+
+  useEffect(() => {
+    const rawGifs = window.localStorage.getItem("takgram-gif-library")
+    const rawFav = window.localStorage.getItem("takgram-gif-favorites")
+    if (rawGifs) {
+      try {
+        const parsed = JSON.parse(rawGifs) as NonNullable<Message["attachments"]>[number][]
+        setGifLibrary(parsed)
+      } catch {}
+    }
+    if (rawFav) {
+      try {
+        const parsed = JSON.parse(rawFav) as string[]
+        setFavoriteGifIds(new Set(parsed))
+      } catch {}
+    }
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem("takgram-gif-library", JSON.stringify(gifLibrary))
+  }, [gifLibrary])
+
+  useEffect(() => {
+    window.localStorage.setItem("takgram-gif-favorites", JSON.stringify(Array.from(favoriteGifIds)))
+  }, [favoriteGifIds])
+
+  useEffect(() => {
+    const audio = new Audio()
+    audio.preload = "metadata"
+    audioRef.current = audio
+
+    const onTimeUpdate = () => setAudioProgress(audio.currentTime || 0)
+    const onLoadedMetadata = () => setAudioDuration(audio.duration || 0)
+    const onEnded = () => {
+      if (audioRepeatMode === "one") {
+        audio.currentTime = 0
+        void audio.play().catch(() => setIsAudioPlaying(false))
+        return
+      }
+      setCurrentAudioIndex((prev) => {
+        const next = prev + 1
+        if (next < audioQueue.length) {
+          return next
+        }
+        if (audioRepeatMode === "all" && audioQueue.length > 0) {
+          return 0
+        }
+        setIsAudioPlaying(false)
+        return prev
+      })
+    }
+
+    audio.addEventListener("timeupdate", onTimeUpdate)
+    audio.addEventListener("loadedmetadata", onLoadedMetadata)
+    audio.addEventListener("ended", onEnded)
+    return () => {
+      audio.pause()
+      audio.removeEventListener("timeupdate", onTimeUpdate)
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata)
+      audio.removeEventListener("ended", onEnded)
+      audioRef.current = null
+    }
+  }, [audioQueue.length, audioRepeatMode])
+
+  const queueForActiveChat = useMemo(() => {
+    if (!activeChat) return []
+    return (messages[activeChat] || [])
+      .map((message) => getTrackFromMessage(message))
+      .filter((track): track is ActiveAudioTrack => Boolean(track))
+  }, [activeChat, messages])
+
+  const currentTrack = currentAudioIndex >= 0 ? audioQueue[currentAudioIndex] : undefined
+
+  const queueForCurrentTrackChat = useMemo(() => {
+    const sourceChatId = currentTrack?.chatId || activeChat
+    if (!sourceChatId) return []
+    return (messages[sourceChatId] || [])
+      .map((message) => getTrackFromMessage(message))
+      .filter((track): track is ActiveAudioTrack => Boolean(track))
+  }, [activeChat, currentTrack?.chatId, messages])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !currentTrack) return
+    const trackMessage = messages[currentTrack.chatId]?.find((msg) => msg.id === currentTrack.messageId)
+    const attachment = trackMessage?.attachments?.find((item) => isAudioAttachment(item))
+    if (!attachment?.url) return
+    if (audio.src !== attachment.url) {
+      audio.src = attachment.url
+      setAudioProgress(0)
+    }
+    audio.playbackRate = audioPlaybackRate
+    if (isAudioPlaying) {
+      audio.play().catch(() => setIsAudioPlaying(false))
+    } else {
+      audio.pause()
+    }
+  }, [currentTrack, isAudioPlaying, messages, audioPlaybackRate])
 
   const handleSelectChat = (chatId: string) => {
     setActiveChat(chatId)
@@ -317,6 +470,348 @@ export function Messenger() {
       }, 2500)
     }
   }, [activeChat, chats])
+
+  const performUploadForMessage = useCallback(
+    async (chatId: string, message: Message) => {
+      const attachment = message.attachments?.[0]
+      if (!attachment) return
+      const sourceFile = attachment.url.startsWith("blob:") ? undefined : undefined
+      try {
+        await simulateChunkedUpload(
+          new File(["binary"], attachment.name || "upload.bin", { type: attachment.mimeType || "application/octet-stream" }),
+          (progress) => {
+            setMessages((prev) => ({
+              ...prev,
+              [chatId]: (prev[chatId] || []).map((item) =>
+                item.id === message.id
+                  ? {
+                      ...item,
+                      attachments: item.attachments?.map((att) =>
+                        att.id === attachment.id ? { ...att, uploadProgress: progress } : att
+                      ),
+                    }
+                  : item
+              ),
+            }))
+          },
+          () => uploadCancelIdsRef.current.has(message.id)
+        )
+
+        if (uploadCancelIdsRef.current.has(message.id)) {
+          setMessages((prev) => ({
+            ...prev,
+            [chatId]: (prev[chatId] || []).filter((item) => item.id !== message.id),
+          }))
+          uploadCancelIdsRef.current.delete(message.id)
+          return
+        }
+
+        setMessages((prev) => ({
+          ...prev,
+          [chatId]: (prev[chatId] || []).map((item) =>
+            item.id === message.id
+              ? {
+                  ...item,
+                  status: "sent",
+                  attachments: item.attachments?.map((att) =>
+                    att.id === attachment.id ? { ...att, uploadProgress: 100 } : att
+                  ),
+                }
+              : item
+          ),
+        }))
+      } catch {
+        setMessages((prev) => ({
+          ...prev,
+          [chatId]: (prev[chatId] || []).filter((item) => item.id !== message.id),
+        }))
+      }
+    },
+    []
+  )
+
+  const createAndQueueMediaMessage = useCallback(
+    (chatId: string, attachment: NonNullable<Message["attachments"]>[number], editor?: MediaEditorPayload) => {
+      const message = createMediaMessage({
+        chatId,
+        senderId: currentUser.id,
+        attachment,
+        text: attachment.type === "file" ? attachment.name : "",
+        editor,
+      })
+      setMessages((prev) => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), message],
+      }))
+      setChats((prev) => prev.map((chat) => (chat.id === chatId ? { ...chat, lastMessage: message } : chat)))
+      void performUploadForMessage(chatId, message)
+    },
+    [performUploadForMessage]
+  )
+
+  const handleUploadFiles = useCallback(
+    async (chatId: string, files: File[], editor?: MediaEditorPayload, sourceType?: string) => {
+      for (const file of files) {
+        let workingFile = file
+        let kind = createAttachmentFromFile(file).type
+
+        if (sourceType === "file") {
+          kind = "file"
+        }
+
+        if (editor && sourceType !== "file" && file.type.startsWith("image/")) {
+          workingFile = await applyImageEditorPayload(file, editor)
+        }
+        if (editor && sourceType !== "file" && file.type.startsWith("video/")) {
+          workingFile = await trimVideoFile(file, editor)
+        }
+
+        if (sourceType !== "file" && (file.type === "image/gif" || file.name.toLowerCase().endsWith(".gif"))) {
+          const converted = await convertGifToTelegramAnimation(file)
+          workingFile = converted
+          kind = "animation"
+        }
+        const attachment = createAttachmentFromFile(workingFile, kind as any)
+        if (workingFile.name.startsWith("voice-note-") || (workingFile as any).__voiceDuration) {
+          attachment.type = "voice"
+          attachment.duration = Number((workingFile as any).__voiceDuration || attachment.duration || 0)
+          attachment.mediaKind = "voice-note"
+        }
+        if (kind === "animation") {
+          attachment.type = "animation"
+          attachment.muted = true
+          attachment.loop = true
+          attachment.streamable = true
+          if (attachment.size && attachment.size <= 5 * 1024 * 1024) {
+            setGifLibrary((prev) => [attachment, ...prev.filter((item) => item.id !== attachment.id)])
+          }
+        }
+        createAndQueueMediaMessage(chatId, attachment, editor)
+      }
+    },
+    [createAndQueueMediaMessage]
+  )
+
+  const handleSendAttachment = useCallback((chatId: string, attachmentType: string) => {
+    const timestamp = Date.now()
+    let attachment: Message["attachments"] = []
+    let messageType: Message["type"] = "file"
+    let content = ""
+
+    if (attachmentType === "media") {
+      const sendVideo = timestamp % 2 === 0
+      if (sendVideo) {
+        messageType = "video"
+        content = "Video"
+        attachment = [
+          {
+            id: `att-v-${timestamp}`,
+            type: "video",
+            url: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4",
+            name: `video-${timestamp}.mp4`,
+            poster:
+              "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=960&q=80",
+            streamable: true,
+            downloadable: true,
+            size: 4_500_000,
+          },
+        ]
+      } else {
+        messageType = "photo"
+        content = "Photo"
+        attachment = [
+          {
+            id: `att-i-${timestamp}`,
+            type: "photo",
+            url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1080&q=80",
+            name: `photo-${timestamp}.jpg`,
+            downloadable: true,
+            streamable: true,
+            size: 1_250_000,
+          },
+        ]
+      }
+    } else if (attachmentType === "music") {
+      messageType = "audio"
+      content = "Music"
+      attachment = [
+        {
+          id: `att-a-${timestamp}`,
+          type: "audio",
+          url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+          name: `track-${timestamp}.mp3`,
+          mimeType: "audio/mpeg",
+          artist: "You",
+          duration: 348,
+          streamable: true,
+          downloadable: true,
+          size: 8_240_000,
+        },
+      ]
+    } else if (attachmentType === "gif") {
+      messageType = "animation"
+      content = "GIF"
+      attachment = [
+        {
+          id: `att-g-${timestamp}`,
+          type: "animation",
+          url: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4",
+          name: `gif-${timestamp}.mp4`,
+          mimeType: "video/mp4",
+          muted: true,
+          loop: true,
+          downloadable: true,
+          streamable: true,
+          size: 2_900_000,
+        },
+      ]
+    } else if (attachmentType === "file") {
+      attachment = [
+        {
+          id: `att-f-${timestamp}`,
+          type: "file",
+          url: "https://samplelib.com/lib/preview/pdf/sample-1.pdf",
+          name: `document-${timestamp}.pdf`,
+          downloadable: true,
+          size: 980_000,
+        },
+      ]
+      content = "Document"
+    } else {
+      attachment = [
+        {
+          id: `att-o-${timestamp}`,
+          type: "file",
+          url: "https://samplelib.com/lib/preview/pdf/sample-1.pdf",
+          name: `file-${timestamp}.pdf`,
+          downloadable: true,
+          size: 640_000,
+        },
+      ]
+      content = "Attachment"
+    }
+
+    const newMessage: Message = {
+      id: `msg-${timestamp}`,
+      chatId,
+      senderId: currentUser.id,
+      content,
+      timestamp: new Date(),
+      status: "sent",
+      type: messageType,
+      attachments: attachment,
+    }
+
+    setMessages((prev) => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] || []), newMessage],
+    }))
+    setChats((prev) =>
+      prev.map((chat) => (chat.id === chatId ? { ...chat, lastMessage: newMessage } : chat))
+    )
+
+    const first = attachment[0]
+    if (first?.type === "animation" && (first.size || 0) <= 5 * 1024 * 1024) {
+      setGifLibrary((prev) => [first, ...prev.filter((item) => item.id !== first.id)])
+    }
+  }, [])
+
+  const handleUploadFilesWithEditor = useCallback(
+    (chatId: string, files: File[], sourceType?: string) => {
+      const MAX_VIDEO_UPLOAD_BYTES = 100 * 1024 * 1024
+      const allowedFiles = files.filter((item) => {
+        if (!item.type.startsWith("video/")) return true
+        return item.size <= MAX_VIDEO_UPLOAD_BYTES
+      })
+      if (allowedFiles.length !== files.length) {
+        window.alert("Maximum allowed video size is 100MB.")
+      }
+      if (allowedFiles.length === 0) return
+
+      const shouldOpenEditor =
+        sourceType !== "file" &&
+        sourceType !== "music" &&
+        sourceType !== "voice" &&
+        allowedFiles.length === 1 &&
+        (allowedFiles[0].type.startsWith("image/") || allowedFiles[0].type.startsWith("video/"))
+      if (shouldOpenEditor) {
+        setEditorChatId(chatId)
+        setEditorFile(allowedFiles[0])
+        return
+      }
+      void handleUploadFiles(chatId, allowedFiles, undefined, sourceType)
+    },
+    [handleUploadFiles]
+  )
+
+  const handleSendSticker = useCallback((chatId: string, sticker: string) => {
+    const message: Message = {
+      id: `msg-${Date.now()}`,
+      chatId,
+      senderId: currentUser.id,
+      content: sticker,
+      timestamp: new Date(),
+      status: "sent",
+      type: "sticker",
+    }
+    setMessages((prev) => ({ ...prev, [chatId]: [...(prev[chatId] || []), message] }))
+    setChats((prev) => prev.map((chat) => (chat.id === chatId ? { ...chat, lastMessage: message } : chat)))
+  }, [])
+
+  const handleSendGifFromLibrary = useCallback(
+    (chatId: string, attachmentId: string) => {
+      const attachment = gifLibrary.find((item) => item.id === attachmentId)
+      if (!attachment) return
+      const clonedAttachment = { ...attachment, id: `att-${Date.now()}` }
+      createAndQueueMediaMessage(chatId, clonedAttachment)
+    },
+    [createAndQueueMediaMessage, gifLibrary]
+  )
+
+  const handleToggleFavoriteGif = useCallback((attachmentId: string) => {
+    setFavoriteGifIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(attachmentId)) next.delete(attachmentId)
+      else next.add(attachmentId)
+      return next
+    })
+  }, [])
+
+  const handleDeleteGif = useCallback((attachmentId: string) => {
+    setGifLibrary((prev) => prev.filter((item) => item.id !== attachmentId))
+    setFavoriteGifIds((prev) => {
+      const next = new Set(prev)
+      next.delete(attachmentId)
+      return next
+    })
+  }, [])
+
+  const handleAddMessageMediaToGifs = useCallback(
+    async (chatId: string, messageId: string) => {
+      const message = (messages[chatId] || []).find((item) => item.id === messageId)
+      const media = message?.attachments?.find((item) => ["photo", "image", "video", "animation"].includes(item.type))
+      if (!media || (media.size || 0) > 5 * 1024 * 1024) return
+      let gifAttachment = { ...media }
+      if (media.type !== "animation") {
+        const converted = await convertGifToTelegramAnimation(new File(["tmp"], "media.mp4", { type: "video/mp4" }))
+        gifAttachment = createAttachmentFromFile(converted, "animation")
+      }
+      gifAttachment.type = "animation"
+      gifAttachment.muted = true
+      gifAttachment.loop = true
+      gifAttachment.streamable = true
+      setGifLibrary((prev) => [gifAttachment as any, ...prev.filter((item) => item.id !== gifAttachment.id)])
+    },
+    [messages]
+  )
+
+  const handleCancelUpload = useCallback((chatId: string, messageId: string) => {
+    uploadCancelIdsRef.current.add(messageId)
+    setMessages((prev) => ({
+      ...prev,
+      [chatId]: (prev[chatId] || []).filter((item) => item.id !== messageId),
+    }))
+  }, [])
 
   const handleReact = useCallback((messageId: string, reaction: string) => {
     if (!activeChat) return
@@ -613,8 +1108,126 @@ export function Messenger() {
       },
       ...prev,
     ])
-    setShowCallsModal(true)
+    setActiveCall({ chatId, type })
+    setShowCallsModal(false)
   }, [chats])
+
+  const handleCloseActiveCall = useCallback(() => {
+    setActiveCall(null)
+  }, [])
+
+  const buildPlaybackQueue = useCallback(
+    (tracks: ActiveAudioTrack[], targetMessageId?: string) => {
+      let ordered = [...tracks]
+      if (audioReverse) {
+        ordered.reverse()
+      }
+      if (audioShuffle) {
+        ordered = ordered
+          .map((track) => ({ track, sortKey: Math.random() }))
+          .sort((a, b) => a.sortKey - b.sortKey)
+          .map((item) => item.track)
+      }
+
+      if (audioPlayScope === "single" && targetMessageId) {
+        const single = ordered.find((track) => track.messageId === targetMessageId)
+        return single ? [single] : ordered.slice(0, 1)
+      }
+
+      return ordered
+    },
+    [audioPlayScope, audioReverse, audioShuffle]
+  )
+
+  const handlePlayAudioTrack = useCallback((chatId: string, messageId: string) => {
+    if (currentTrack?.messageId === messageId) {
+      setIsAudioPlaying((prev) => !prev)
+      return
+    }
+    const tracks = (messages[chatId] || [])
+      .map((message) => getTrackFromMessage(message))
+      .filter((track): track is ActiveAudioTrack => Boolean(track))
+    if (tracks.length === 0) return
+
+    const queue = buildPlaybackQueue(tracks, messageId)
+    const targetIndex = queue.findIndex((track) => track.messageId === messageId)
+    const nextIndex = targetIndex >= 0 ? targetIndex : 0
+    setAudioQueue(queue)
+    setCurrentAudioIndex(nextIndex)
+    setIsAudioPlaying(true)
+    setShowAudioDetails(true)
+  }, [buildPlaybackQueue, currentTrack?.messageId, messages])
+
+  const handleToggleAudioPlayback = useCallback(() => {
+    if (currentAudioIndex < 0) return
+    setIsAudioPlaying((prev) => !prev)
+  }, [currentAudioIndex])
+
+  const handleNextTrack = useCallback(() => {
+    setCurrentAudioIndex((prev) => {
+      if (prev < 0 || prev >= audioQueue.length - 1) return prev
+      return prev + 1
+    })
+    setIsAudioPlaying(true)
+  }, [audioQueue.length])
+
+  const handlePrevTrack = useCallback(() => {
+    setCurrentAudioIndex((prev) => {
+      if (prev <= 0) return prev
+      return prev - 1
+    })
+    setIsAudioPlaying(true)
+  }, [])
+
+  const handleSelectTrackFromQueue = useCallback((trackId: string) => {
+    const sourceChatId = currentTrack?.chatId || activeChat
+    if (!sourceChatId) return
+    const allTracks = (messages[sourceChatId] || [])
+      .map((message) => getTrackFromMessage(message))
+      .filter((track): track is ActiveAudioTrack => Boolean(track))
+    const selected = allTracks.find((track) => track.id === trackId)
+    if (!selected) return
+    const queue = buildPlaybackQueue(allTracks, selected.messageId)
+    const idx = Math.max(0, queue.findIndex((track) => track.messageId === selected.messageId))
+    setAudioQueue(queue)
+    setCurrentAudioIndex(idx)
+    setIsAudioPlaying(true)
+  }, [activeChat, buildPlaybackQueue, currentTrack?.chatId, messages])
+
+  const handleSeekAudio = useCallback((seconds: number) => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.currentTime = Math.max(0, seconds)
+    setAudioProgress(audio.currentTime)
+  }, [])
+
+  const handleCycleRepeatMode = useCallback(() => {
+    setAudioRepeatMode((prev) => (prev === "off" ? "one" : prev === "one" ? "all" : "off"))
+  }, [])
+
+  const handleToggleShuffle = useCallback(() => {
+    setAudioShuffle((prev) => !prev)
+  }, [])
+
+  const handleToggleReverse = useCallback(() => {
+    setAudioReverse((prev) => !prev)
+  }, [])
+
+  const handlePlayScopeChange = useCallback((scope: "all" | "single") => {
+    setAudioPlayScope(scope)
+  }, [])
+
+  useEffect(() => {
+    if (!currentTrack?.chatId) return
+    const chatTracks = (messages[currentTrack.chatId] || [])
+      .map((message) => getTrackFromMessage(message))
+      .filter((track): track is ActiveAudioTrack => Boolean(track))
+    if (chatTracks.length === 0) return
+    const queue = buildPlaybackQueue(chatTracks, currentTrack.messageId)
+    const nextIndex = Math.max(0, queue.findIndex((track) => track.messageId === currentTrack.messageId))
+    setAudioQueue(queue)
+    setCurrentAudioIndex(nextIndex)
+  }, [audioPlayScope, audioReverse, audioShuffle, buildPlaybackQueue, currentTrack?.chatId, currentTrack?.messageId, messages])
 
   const handleOpenChatInNewWindow = useCallback((chatId: string) => {
     window.open(`/?chat=${encodeURIComponent(chatId)}`, "_blank", "noopener,noreferrer")
@@ -626,6 +1239,8 @@ export function Messenger() {
     ? chats.find((c) => c.id === activeChat)
     : undefined
   const chatMessages = activeChat ? messages[activeChat] || [] : []
+  const activeCallChat = activeCall ? chats.find((c) => c.id === activeCall.chatId) : undefined
+  const currentPlayingMessageId = currentTrack?.messageId
 
   // Settings screen
   if (currentScreen === "settings") {
@@ -636,6 +1251,34 @@ export function Messenger() {
           onLogout={() => {
             window.location.href = "/login"
           }}
+        />
+        <div className="fixed bottom-3 left-3 right-3 z-40 lg:left-auto lg:right-4 lg:w-[420px]">
+          <AudioPlayerStrip
+            track={currentTrack}
+            isPlaying={isAudioPlaying}
+            progress={audioProgress}
+            duration={audioDuration}
+            onTogglePlay={handleToggleAudioPlayback}
+            onPrev={handlePrevTrack}
+            onNext={handleNextTrack}
+            onOpenQueue={() => setShowAudioQueue(true)}
+            onOpenDetails={() => setShowAudioDetails(true)}
+          />
+        </div>
+        <AudioQueueModal
+          isOpen={showAudioQueue}
+          tracks={queueForCurrentTrackChat}
+          currentTrackId={currentTrack?.id}
+          playScope={audioPlayScope}
+          repeatMode={audioRepeatMode}
+          shuffleEnabled={audioShuffle}
+          reverseEnabled={audioReverse}
+          onClose={() => setShowAudioQueue(false)}
+          onSelectTrack={handleSelectTrackFromQueue}
+          onPlayScopeChange={handlePlayScopeChange}
+          onCycleRepeat={handleCycleRepeatMode}
+          onToggleShuffle={handleToggleShuffle}
+          onToggleReverse={handleToggleReverse}
         />
       </div>
     )
@@ -650,6 +1293,34 @@ export function Messenger() {
           onLogout={() => {
             window.location.href = "/login"
           }}
+        />
+        <div className="fixed bottom-3 left-3 right-3 z-40 lg:left-auto lg:right-4 lg:w-[420px]">
+          <AudioPlayerStrip
+            track={currentTrack}
+            isPlaying={isAudioPlaying}
+            progress={audioProgress}
+            duration={audioDuration}
+            onTogglePlay={handleToggleAudioPlayback}
+            onPrev={handlePrevTrack}
+            onNext={handleNextTrack}
+            onOpenQueue={() => setShowAudioQueue(true)}
+            onOpenDetails={() => setShowAudioDetails(true)}
+          />
+        </div>
+        <AudioQueueModal
+          isOpen={showAudioQueue}
+          tracks={queueForCurrentTrackChat}
+          currentTrackId={currentTrack?.id}
+          playScope={audioPlayScope}
+          repeatMode={audioRepeatMode}
+          shuffleEnabled={audioShuffle}
+          reverseEnabled={audioReverse}
+          onClose={() => setShowAudioQueue(false)}
+          onSelectTrack={handleSelectTrackFromQueue}
+          onPlayScopeChange={handlePlayScopeChange}
+          onCycleRepeat={handleCycleRepeatMode}
+          onToggleShuffle={handleToggleShuffle}
+          onToggleReverse={handleToggleReverse}
         />
       </div>
     )
@@ -719,9 +1390,9 @@ export function Messenger() {
         onClose={() => setShowCallsModal(false)}
         calls={calls}
         contacts={availableContacts}
-        onStartNewCall={() => {
+        onStartNewCall={(type) => {
           if (activeChat) {
-            handleStartCall(activeChat, "audio")
+            handleStartCall(activeChat, type)
           }
         }}
         onCallContact={(userId) => {
@@ -732,7 +1403,22 @@ export function Messenger() {
             handleStartCall(existingPrivateChat.id, "audio")
             return
           }
-          handleSelectContact(userId)
+          const user = contacts.find((u) => u.id === userId)
+          if (!user) return
+          const newChat: Chat = {
+            id: `chat-${Date.now()}`,
+            type: "private",
+            name: user.name,
+            participants: [currentUser, user],
+            unreadCount: 0,
+          }
+          setChats((prev) => [newChat, ...prev])
+          setMessages((prev) => ({
+            ...prev,
+            [newChat.id]: prev[newChat.id] || [],
+          }))
+          setActiveChat(newChat.id)
+          handleStartCall(newChat.id, "audio")
         }}
         onDeleteAllCalls={() => setCalls([])}
         onDeleteSelectedCalls={(callIds) => {
@@ -770,6 +1456,68 @@ export function Messenger() {
         onForward={handleForwardMessages}
       />
 
+      <AudioQueueModal
+        isOpen={showAudioQueue}
+        tracks={queueForCurrentTrackChat}
+        currentTrackId={currentTrack?.id}
+        playScope={audioPlayScope}
+        repeatMode={audioRepeatMode}
+        shuffleEnabled={audioShuffle}
+        reverseEnabled={audioReverse}
+        onClose={() => setShowAudioQueue(false)}
+        onSelectTrack={handleSelectTrackFromQueue}
+        onPlayScopeChange={handlePlayScopeChange}
+        onCycleRepeat={handleCycleRepeatMode}
+        onToggleShuffle={handleToggleShuffle}
+        onToggleReverse={handleToggleReverse}
+      />
+
+      <AudioPlayerDetailsModal
+        isOpen={showAudioDetails}
+        track={currentTrack}
+        progress={audioProgress}
+        duration={audioDuration}
+        speed={audioPlaybackRate}
+        playScope={audioPlayScope}
+        repeatMode={audioRepeatMode}
+        shuffleEnabled={audioShuffle}
+        reverseEnabled={audioReverse}
+        onClose={() => setShowAudioDetails(false)}
+        onSeek={handleSeekAudio}
+        onSpeedChange={setAudioPlaybackRate}
+        onPlayScopeChange={handlePlayScopeChange}
+        onCycleRepeat={handleCycleRepeatMode}
+        onToggleShuffle={handleToggleShuffle}
+        onToggleReverse={handleToggleReverse}
+        onOpenQueue={() => {
+          setShowAudioQueue(true)
+          setShowAudioDetails(false)
+        }}
+      />
+
+      <CallScreen
+        isOpen={Boolean(activeCall)}
+        type={activeCall?.type || "audio"}
+        chat={activeCallChat}
+        onClose={handleCloseActiveCall}
+      />
+
+      <MediaEditorModal
+        file={editorFile}
+        isOpen={Boolean(editorFile)}
+        onClose={() => {
+          setEditorFile(null)
+          setEditorChatId(null)
+        }}
+        onConfirm={(editorOptions, finalFile) => {
+          if (editorChatId) {
+            void handleUploadFiles(editorChatId, [finalFile], editorOptions, "media")
+          }
+          setEditorFile(null)
+          setEditorChatId(null)
+        }}
+      />
+
       {/* Chat List - Always visible on desktop, conditionally on mobile */}
       <div
         className={cn(
@@ -804,6 +1552,15 @@ export function Messenger() {
           onBlockUser={handleBlockUser}
           onClearHistory={handleClearHistory}
           onDelete={handleDeleteChat}
+          activeTrack={currentTrack}
+          isAudioPlaying={isAudioPlaying}
+          audioProgress={audioProgress}
+          audioDuration={audioDuration}
+          onToggleAudioPlayback={handleToggleAudioPlayback}
+          onPrevTrack={handlePrevTrack}
+          onNextTrack={handleNextTrack}
+          onOpenAudioQueue={() => setShowAudioQueue(true)}
+          onOpenAudioDetails={() => setShowAudioDetails(true)}
           className="w-full"
         />
       </div>
@@ -826,7 +1583,19 @@ export function Messenger() {
             onDeleteMessage={handleDeleteMessage}
             onPinMessage={handlePinMessage}
             onForwardMessage={handleForwardMessage}
+            onSendAttachment={handleSendAttachment}
+            onUploadFiles={handleUploadFilesWithEditor}
+            onSendSticker={handleSendSticker}
+            gifLibrary={gifLibrary}
+            favoriteGifIds={favoriteGifIds}
+            onSendGifFromLibrary={handleSendGifFromLibrary}
+            onToggleFavoriteGif={handleToggleFavoriteGif}
+            onDeleteGif={handleDeleteGif}
             onStartCall={handleStartCall}
+            onPlayAudioTrack={handlePlayAudioTrack}
+            onAddToGifs={handleAddMessageMediaToGifs}
+            onCancelUpload={handleCancelUpload}
+            playingMessageId={currentPlayingMessageId}
             onMuteChat={handleMuteChat}
             onClearChatHistory={handleClearHistory}
             onDeleteChat={handleDeleteChat}

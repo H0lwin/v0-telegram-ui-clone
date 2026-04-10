@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { X, Trash2, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff } from "lucide-react"
+import { X, Trash2, Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff } from "lucide-react"
 import { Avatar } from "./avatar"
 import {
   DropdownMenu,
@@ -27,7 +27,7 @@ interface CallsModalProps {
   onClose: () => void
   calls: Call[]
   contacts: User[]
-  onStartNewCall?: () => void
+  onStartNewCall?: (type: "audio" | "video") => void
   onCallContact?: (userId: string) => void
   onDeleteAllCalls?: () => void
   onDeleteSelectedCalls?: (callIds: string[]) => void
@@ -159,13 +159,20 @@ export function CallsModal({
         </div>
 
         {/* Start New Call Button */}
-        <div className="p-4 border-b border-border">
+        <div className="grid grid-cols-2 gap-2 p-4 border-b border-border">
           <button
-            onClick={onStartNewCall}
+            onClick={() => onStartNewCall?.("audio")}
             className="w-full px-4 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
           >
             <Phone className="h-5 w-5" />
-            <span>Start New Call</span>
+            <span>Voice</span>
+          </button>
+          <button
+            onClick={() => onStartNewCall?.("video")}
+            className="w-full px-4 py-3 bg-accent text-foreground rounded-lg font-medium hover:bg-accent/80 transition-colors flex items-center justify-center gap-2"
+          >
+            <Video className="h-5 w-5" />
+            <span>Video</span>
           </button>
         </div>
 

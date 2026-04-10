@@ -55,6 +55,8 @@ export function ChatListItem({
   const [mounted, setMounted] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const itemRef = useRef<HTMLButtonElement>(null)
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressTriggeredRef = useRef(false)
   const isOutgoing = chat.lastMessage?.senderId === "user-1"
   const participant = chat.participants.find((p) => p.id !== "user-1")
   const hasUnread = chat.unreadCount > 0
@@ -68,12 +70,38 @@ export function ChatListItem({
     }
   }
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (window.innerWidth >= 1024) return
+    const touch = e.touches[0]
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true
+      setContextMenu({ x: touch.clientX, y: touch.clientY })
+    }, 550)
+  }
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+
   return (
     <>
       <button
         ref={itemRef}
-        onClick={onClick}
+        onClick={() => {
+          if (longPressTriggeredRef.current) {
+            longPressTriggeredRef.current = false
+            return
+          }
+          onClick?.()
+        }}
         onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={clearLongPress}
+        onTouchMove={clearLongPress}
+        onTouchCancel={clearLongPress}
         style={{ fontFamily: "var(--font-sans)" }}
         className={cn(
           "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 rounded-lg bg-opacity-80",

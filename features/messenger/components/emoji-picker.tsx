@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useMemo, useRef, useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import { Search } from "lucide-react"
 
 interface EmojiPickerProps {
   onSelect: (emoji: string) => void
@@ -10,21 +11,23 @@ interface EmojiPickerProps {
 }
 
 const emojiCategories = {
-  "Smileys": ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😙", "🥲", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🤫", "🤔", "🤐"],
-  "Gestures": ["👍", "👎", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👋", "🤚", "🖐️", "✋", "🖖", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💪", "🦾", "🦿", "🦵", "🦶"],
-  "Hearts": ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "♥️"],
-  "Objects": ["💬", "🗨️", "🗯️", "💭", "📱", "💻", "🖥️", "📷", "📹", "🎬", "📞", "☎️", "📺", "📻", "🎙️", "🎚️", "🎛️", "⏰", "⌚", "📅", "📆", "🗓️", "📧", "📨", "📩", "📤", "📥"],
-  "Symbols": ["✅", "❌", "❗", "❓", "💯", "🔥", "⭐", "🌟", "✨", "💫", "🎉", "🎊", "🏆", "🥇", "🥈", "🥉", "🏅", "🎯", "💡", "🔔", "🔕", "📣", "📢", "🔒", "🔓"]
+  Recent: ["😂", "❤️", "🔥", "👍", "😭", "🙏", "😍", "🥲", "😁", "👀"],
+  Smileys: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "🙂", "😊", "😇", "😉", "😍", "🥰", "😘", "😎", "🤓", "🤩", "🥳", "😴", "🤔", "😶", "🙄", "😬", "😢", "😭", "😤", "😡", "🤯", "🥲"],
+  People: ["👍", "👎", "👏", "🙌", "🙏", "🤝", "👌", "✌️", "🤟", "🤘", "👋", "🤚", "🖐️", "✋", "🫶", "💪", "🫡", "👀", "🧠", "🫀", "🫂", "🧑‍💻", "👨‍💻", "👩‍💻"],
+  Nature: ["🐶", "🐱", "🦊", "🐻", "🐼", "🐨", "🦁", "🐯", "🐸", "🐵", "🐤", "🦉", "🦋", "🐢", "🌱", "🌳", "🌸", "🌹", "🌻", "🌍", "🌙", "⭐", "☀️", "🌧️"],
+  Food: ["🍎", "🍊", "🍉", "🍇", "🍓", "🍒", "🍍", "🥑", "🍔", "🍕", "🌭", "🍟", "🥪", "🍣", "🍜", "🍩", "🍪", "🍫", "🍿", "☕", "🍵", "🧃", "🥤"],
+  Activity: ["⚽", "🏀", "🏐", "🎾", "🏓", "🏸", "🥊", "🎯", "🎮", "🕹️", "🎲", "🧩", "🎸", "🎹", "🎧", "🎤", "🎬", "📷", "🚀", "🏆"],
+  Travel: ["🚗", "🚕", "🚌", "🚎", "🚓", "🚑", "🚒", "🚚", "🚲", "🏍️", "✈️", "🚁", "🚢", "⛵", "🚆", "🚇", "🗺️", "🏖️", "🏔️", "🏙️"],
+  Symbols: ["❤️", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💯", "✅", "❌", "⚠️", "❗", "❓", "🔔", "🔕", "📌", "📎", "🔒", "🔓"],
 }
 
-const recentEmojis = ["😀", "👍", "❤️", "🔥", "✅", "😂", "🎉", "💯"]
-
 export function EmojiPicker({ onSelect, onClose, className }: EmojiPickerProps) {
-  const [activeCategory, setActiveCategory] = useState("Smileys")
+  const [activeCategory, setActiveCategory] = useState<keyof typeof emojiCategories>("Smileys")
+  const [query, setQuery] = useState("")
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    const handleClickOutside = (event: MouseEvent) => {
       if (ref.current && !ref.current.contains(event.target as Node)) {
         onClose()
       }
@@ -33,63 +36,59 @@ export function EmojiPicker({ onSelect, onClose, className }: EmojiPickerProps) 
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [onClose])
 
+  const emojis = useMemo(() => {
+    if (!query.trim()) return emojiCategories[activeCategory]
+    const all = Object.values(emojiCategories).flat()
+    return all.filter((emoji) => emoji.includes(query.trim()))
+  }, [activeCategory, query])
+
   return (
-    <div 
-      ref={ref}
-      className={cn(
-        "bg-card rounded-xl shadow-xl border border-border overflow-hidden w-72",
-        className
-      )}
-    >
-      {/* Recent */}
-      <div className="p-2 border-b border-border">
-        <p className="text-xs text-muted-foreground mb-1.5 px-1">Recent</p>
-        <div className="flex flex-wrap gap-1">
-          {recentEmojis.map((emoji) => (
-            <button
-              key={emoji}
-              onClick={() => onSelect(emoji)}
-              className="p-1.5 text-xl hover:bg-accent rounded-lg transition-colors"
-            >
-              {emoji}
-            </button>
-          ))}
+    <div ref={ref} className={cn("w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-xl", className)}>
+      <div className="border-b border-border p-2">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search emoji"
+            className="w-full rounded-lg bg-input py-2 pl-8 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
         </div>
       </div>
 
-      {/* Categories */}
-      <div className="flex border-b border-border overflow-x-auto scrollbar-thin">
+      <div className="flex overflow-x-auto border-b border-border scrollbar-thin">
         {Object.keys(emojiCategories).map((category) => (
           <button
             key={category}
-            onClick={() => setActiveCategory(category)}
+            onClick={() => {
+              setActiveCategory(category as keyof typeof emojiCategories)
+              setQuery("")
+            }}
             className={cn(
-              "px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors",
-              activeCategory === category 
-                ? "text-primary border-b-2 border-primary" 
-                : "text-muted-foreground hover:text-foreground"
+              "shrink-0 px-3 py-2 text-xs font-medium transition-colors",
+              activeCategory === category ? "border-b-2 border-primary text-primary" : "text-muted-foreground hover:text-foreground"
             )}
           >
-            
             {category}
           </button>
         ))}
       </div>
 
-      {/* Emoji Grid */}
-      <div className="p-2 h-48 overflow-y-auto scrollbar-thin">
+      <div className="h-56 overflow-y-auto p-2 scrollbar-thin">
         <div className="grid grid-cols-8 gap-1">
-          {emojiCategories[activeCategory as keyof typeof emojiCategories].map((emoji) => (
+          {emojis.map((emoji, idx) => (
             <button
-              key={emoji}
+              key={`${emoji}-${idx}`}
               onClick={() => onSelect(emoji)}
-              className="p-1.5 text-xl hover:bg-accent rounded-lg transition-colors"
+              className="rounded-lg p-1.5 text-2xl hover:bg-accent"
             >
               {emoji}
             </button>
           ))}
         </div>
+        {emojis.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No emoji found.</p>}
       </div>
     </div>
   )
 }
+
